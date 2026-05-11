@@ -1,5 +1,7 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
+// Matches `swift-cardano-core` / `swift-cardano-utils`; nothing in this manifest needs 6.3
+// (traits + `.when(traits:)` arrived in 6.1, `swiftLanguageModes` in 6.0).
 
 import PackageDescription
 
