@@ -13,8 +13,8 @@ the chain provider; `Koios` and `Ogmios` are drop-in replacements via ``Provider
 ```swift
 import SwiftCardanoWallet
 
-let wallet = try await MnemonicWallet(
-    mnemonic: "abandon abandon abandon … about",
+let wallet = try await Wallet.mnemonic(
+    phrase: "abandon abandon abandon … about",
     network: .mainnet,
     provider: .blockfrost(projectId: "mainnet_…")
 )
@@ -24,6 +24,10 @@ let txId = try await wallet.send(
 )
 print(txId)
 ```
+
+`Wallet` is an enum — the call above builds a ``MnemonicWallet`` and wraps it in
+``Wallet/mnemonic(_:)``. The instance methods (``Wallet/balance()``, ``Wallet/utxos()``,
+``Wallet/send(lovelace:to:)``) dispatch to the wrapped actor.
 
 That's it — `send(lovelace:to:)` builds the transaction, signs it with the wallet's keys,
 and submits via the chosen provider. The returned `String` is the on-chain transaction id.
@@ -36,8 +40,8 @@ should show the fee to the user first), break the call apart:
 ### 1. Construct the wallet
 
 ```swift
-let wallet = try await MnemonicWallet(
-    mnemonic: phrase,                                   // 12 / 15 / 18 / 21 / 24 word BIP-39
+let wallet = try await Wallet.mnemonic(
+    phrase: phrase,                                     // 12 / 15 / 18 / 21 / 24 word BIP-39
     network: .mainnet,
     provider: .blockfrost(projectId: "mainnet_…"),
     accountIndex: 0,                                    // CIP-1852 account index
@@ -45,29 +49,36 @@ let wallet = try await MnemonicWallet(
 )
 ```
 
-The wallet is an `actor`. Construction is `async` because it resolves the provider — for
-`Blockfrost`, that's an HTTP capability check. No keys touch disk; the mnemonic is held in
-memory.
+This builds an ``MnemonicWallet`` actor and wraps it in ``Wallet/mnemonic(_:)``.
+Construction is `async` because it resolves the provider — for `Blockfrost`, that's an
+HTTP capability check. No keys touch disk; the mnemonic is held in memory.
 
 ### 2. Read state
 
 ```swift
-let receive = try await wallet.receiveAddress()         // role 0, index 0
+let address = try await wallet.primaryAddress()         // role 0, index 0 for mnemonic
 let balance = try await wallet.balance()                // ADA + multi-asset + rewards
 let utxos   = try await wallet.utxos()                  // tracker-cached snapshot
-print("receive: \(try receive.toBech32())")
+print("address: \(try address.toBech32())")
 print("ada: \(balance.lovelace) (over \(balance.utxoCount) UTxOs)")
 ```
 
-`balance()` triggers an initial chain sweep across the `external` and `change` roles up to
-`gapLimit`. Subsequent calls return the cached snapshot until you explicitly call
-`refresh()` (e.g. after a successful submit).
+For mnemonic wallets, ``Wallet/balance()`` triggers an initial chain sweep across the
+`external` and `change` roles up to `gapLimit`. Subsequent calls return the cached
+snapshot until you explicitly call ``MnemonicWallet/refresh()`` (e.g. after a
+successful submit — reachable via ``Wallet/mnemonicWallet``).
 
 ### 3. Build the transaction
 
+`prepareSend` lives on the concrete actor, not the enum — drop down via the typed
+accessor:
+
 ```swift
 let dest = try Address.fromBech32("addr1q…")
-let prepared = try await wallet.prepareSend(lovelace: 5_000_000, to: dest)
+let prepared = try await wallet.mnemonicWallet!.prepareSend(
+    lovelace: 5_000_000,
+    to: dest
+)
 
 print("fee: \(prepared.transaction.transactionBody.fee) lovelace")
 print("signing paths: \(prepared.signingPaths.count)")
@@ -117,21 +128,28 @@ your own ``SwiftCardanoChain/ChainContext`` implementation — see
 
 ## What's next
 
-- <doc:WalletTypes> — CLI keys, encrypted blobs, watch-only, multisig, hardware.
-- ``MnemonicWallet/sendTo(handle:lovelace:)`` — resolve `$alice` → address via
+- <doc:WalletTypes> — CLI keys, encrypted blobs, watch-only (including address-only
+  monitoring), multisig, hardware.
+- ``Wallet/sendTo(handle:lovelace:)`` — resolve `$alice` → address via
   `swift-handles-api`, then send. Pass a ``DefaultHandleResolver`` to the wallet's
   `handleResolver:` init parameter.
 - ``MnemonicWallet/registerStake()`` / ``MnemonicWallet/delegate(toPool:)`` /
-  ``MnemonicWallet/claimAllRewards()`` — staking shortcuts.
-- ``MnemonicWallet/mintNFT(metadata:policy:assetName:)`` — CIP-25 v1 NFT minting via
-  native script.
+  ``MnemonicWallet/claimAllRewards()`` — staking shortcuts (reachable via
+  `wallet.mnemonicWallet`).
+- ``MnemonicWallet/mintNFT(name:metadata:ttlSlotsFromNow:to:)`` — one-shot CIP-25 NFT
+  minting under a generated native-script policy. CIP-25 v2 byte-keyed asset names are
+  available via ``CIP25NFTMetadata/encode(policyId:assetName:version:)`` with
+  `version: .v2`.
+- ``MnemonicWallet/mint(amount:assetName:plutusPolicy:redeemer:to:minOutputLovelace:metadata:collateral:additionalSigningPaths:)`` —
+  Plutus V1 / V2 / V3 minting. Auto-picks collateral; uses a Unit redeemer by default;
+  TxBuilder auto-estimates execution units when the redeemer's `exUnits` is `nil`.
 - ``MnemonicWallet/delegateVote(to:)`` / ``MnemonicWallet/vote(on:vote:anchor:)`` —
   Conway-era governance.
 
 ## Persistence
 
-The five-line snippet keeps the mnemonic in memory only. For a real app, you'll want to
-encrypt the mnemonic with a user passphrase and persist the resulting blob. Use
+The five-line snippet keeps the mnemonic in memory only. For a real app, encrypt the
+mnemonic with a user passphrase and persist the resulting blob. Use
 ``EncryptedKeyManager`` to encrypt and a ``KeyStore`` (``FileKeyStore`` for general use,
 ``KeychainKeyStore`` on Apple platforms) to store:
 
@@ -146,10 +164,16 @@ let store = KeychainKeyStore(service: "com.example.MyWallet")
 try await store.save(blob, id: "primary")
 ```
 
-To re-open later:
+To re-open later, use the ``Wallet/encrypted(blob:passphrase:network:provider:accountIndex:utxoStore:gapLimit:handleResolver:)``
+factory — it decrypts the blob and constructs the wallet in one call:
 
 ```swift
 let blob = try await store.load(id: "primary")
-let km   = try await EncryptedKeyManager(blob: blob, passphrase: userPassphrase)
-// `km` is a KeyManager — pair it with a chain context and you're back in business.
+let wallet = try await Wallet.encrypted(
+    blob: blob,
+    passphrase: userPassphrase,
+    network: .mainnet,
+    provider: .blockfrost(projectId: "mainnet_…")
+)
+// `wallet.kind == .mnemonic` — encryption is a key-management concern, not a runtime one.
 ```

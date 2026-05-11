@@ -110,7 +110,7 @@ struct MnemonicWalletTests {
 
     @Test func walletConformsToProtocol() async throws {
         let stub = StubChainContext()
-        let wallet: any Wallet = try await MnemonicWallet(
+        let wallet: any WalletProtocol = try await MnemonicWallet(
             mnemonic: testMnemonic,
             network: .mainnet,
             provider: .custom(make: { stub })

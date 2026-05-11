@@ -30,8 +30,19 @@ public actor EncryptedKeyManager: KeyManager {
 
     private let inner: MnemonicKeyManager
     private let mnemonicPlaintext: String      // kept for re-encryption / re-export
-    private let bip39Passphrase: String
+    private let bip39PassphrasePlaintext: String
     private let iterations: Int
+
+    /// The decrypted mnemonic phrase. **Sensitive** — holding this in plain memory is the
+    /// same security boundary as holding the ``MnemonicKeyManager`` itself. Exposed so
+    /// higher-level factories (e.g. ``Wallet/encrypted(blob:passphrase:network:provider:)``)
+    /// can reconstruct a ``MnemonicWallet`` after decryption. The actor isolation gates
+    /// access; do not log or persist this value.
+    public var mnemonic: String { mnemonicPlaintext }
+
+    /// The decrypted BIP-39 passphrase (empty string if none). Same caveats as
+    /// ``mnemonic``.
+    public var bip39Passphrase: String { bip39PassphrasePlaintext }
 
     // MARK: - Construction
 
@@ -46,7 +57,7 @@ public actor EncryptedKeyManager: KeyManager {
             throw WalletError.invalidPassphrase
         }
         self.mnemonicPlaintext = mnemonic
-        self.bip39Passphrase = bip39Passphrase
+        self.bip39PassphrasePlaintext = bip39Passphrase
         self.iterations = iterations
         self.inner = try MnemonicKeyManager(mnemonic: mnemonic, passphrase: bip39Passphrase)
     }
@@ -103,7 +114,7 @@ public actor EncryptedKeyManager: KeyManager {
         let bip39 = parts.count > 1 ? parts.dropFirst().joined(separator: "\n") : ""
 
         self.mnemonicPlaintext = phrase
-        self.bip39Passphrase = bip39
+        self.bip39PassphrasePlaintext = bip39
         self.iterations = blob.iterations
         self.inner = try MnemonicKeyManager(mnemonic: phrase, passphrase: bip39)
     }
@@ -126,7 +137,7 @@ public actor EncryptedKeyManager: KeyManager {
         let nonce = try AES.GCM.Nonce(data: nonceData)
         var plaintext = Data(mnemonicPlaintext.utf8)
         plaintext.append(0x0a)  // \n
-        plaintext.append(Data(bip39Passphrase.utf8))
+        plaintext.append(Data(bip39PassphrasePlaintext.utf8))
 
         let sealed = try AES.GCM.seal(plaintext, using: symKey, nonce: nonce)
         return EncryptedBlob(

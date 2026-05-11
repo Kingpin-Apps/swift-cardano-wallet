@@ -92,6 +92,53 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
         let key = (try? address.toBech32()) ?? address.description
         return stakeInfoByAddress[key] ?? []
     }
+
+    // MARK: - Plutus evaluation
+
+    /// Run the CEK machine locally via `SwiftCardanoUPLC.PhaseTwo` so Plutus mint /
+    /// spend tests can exercise the auto-estimate-execution-units path through TxBuilder.
+    /// Resolves each transaction input + reference input against the same address-keyed
+    /// UTxO map this stub returns from ``utxos(address:)``.
+    func evaluateTxCBOR(cbor: Data) async throws -> [String: ExecutionUnits] {
+        let tx = try Transaction.fromCBOR(data: cbor)
+        let resolvedInputs = try resolveInputs(for: tx)
+        let params = try await protocolParameters()
+        return try await evaluateTx(
+            tx: tx,
+            resolvedInputs: resolvedInputs,
+            protocolParameters: params
+        )
+    }
+
+    /// Find each `TransactionInput` from the body (and reference-input set, if any) in
+    /// our address-keyed UTxO cache. Missing inputs throw — same shape callers get from a
+    /// real chain backend that can't resolve them.
+    private func resolveInputs(for tx: Transaction) throws -> [UTxO] {
+        // Build a flat input→UTxO lookup once across every UTxO we stub.
+        var byInput: [TransactionInput: UTxO] = [:]
+        for (_, utxos) in utxosByAddress {
+            for u in utxos {
+                byInput[u.input] = u
+            }
+        }
+
+        var resolved: [UTxO] = []
+        let body = tx.transactionBody
+
+        for input in body.inputs.asArray {
+            if let u = byInput[input] {
+                resolved.append(u)
+            }
+        }
+        if let refs = body.referenceInputs {
+            for input in refs.asList {
+                if let u = byInput[input] {
+                    resolved.append(u)
+                }
+            }
+        }
+        return resolved
+    }
 }
 
 // MARK: - Test fixture helpers

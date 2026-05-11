@@ -7,13 +7,28 @@ For macOS / iOS / Linux.
 ```swift
 import SwiftCardanoWallet
 
-let wallet = try await MnemonicWallet(
-    mnemonic: "abandon abandon abandon … about",
+let wallet = try await Wallet.mnemonic(
+    phrase: "abandon abandon abandon … about",
     network: .mainnet,
     provider: .blockfrost(projectId: "mainnet…")
 )
 let txid = try await wallet.send(lovelace: 5_000_000, to: address)
 ```
+
+`Wallet` is an enum that unifies all wallet kinds (`mnemonic`, `textEnvelope`, `watchOnly`,
+`multisig`, `hardware`) behind one `Sendable` value. Six labeled factory methods
+(`Wallet.mnemonic(phrase:...)`, `Wallet.encrypted(blob:passphrase:...)`,
+`Wallet.textEnvelope(paymentKeyFile:...)`, `Wallet.watchOnly(...)`, `Wallet.multisig(...)`,
+`Wallet.hardware(...)`) cover every supported construction. Common reads — `kind`,
+`network`, `primaryAddress()`, `utxos()`, `balance()`, `canSign` — dispatch automatically.
+For richer flows, extract the concrete actor via `wallet.mnemonicWallet`,
+`wallet.textEnvelopeWallet`, `wallet.watchOnlyWallet`, `wallet.multisigWallet`,
+`wallet.hardwareWallet`.
+
+> **Why six factories but five cases?** "Encrypted" is a key-management concern, not a
+> runtime distinction — `Wallet.encrypted(blob:passphrase:...)` decrypts and returns a
+> `.mnemonic(_:)` case, because once decrypted there's no runtime difference between a
+> mnemonic loaded from a phrase and one recovered from an `EncryptedBlob`.
 
 ## Features
 
@@ -21,18 +36,19 @@ let txid = try await wallet.send(lovelace: 5_000_000, to: address)
   passphrase-encrypted, native-script multisig, and hardware (Ledger / Trezor via
   `cardano-hw-cli`).
 - **All major operations** — send, stake (register / delegate / withdraw), mint
-  (native script + CIP-25 v1 NFTs), Conway-era governance (DRep registration, vote
-  delegation, voting). Auto coin selection, auto signing, auto submit.
+  (**both** native-script and Plutus V1/V2/V3 policies, with CIP-25 v1 + v2 NFTs),
+  Conway-era governance (DRep registration, vote delegation, voting). Auto coin
+  selection, auto signing, auto submit, auto collateral selection for Plutus mints.
 - **Five chain providers** — Blockfrost, Koios, Ogmios, Kupo, Offline. Pluggable via
   `ProviderConfig`.
 - **CIP support** — CIP-1852 (HD), CIP-8 (message signing), CIP-14 (asset
-  fingerprints), CIP-25 v1 (NFT metadata), CIP-30 (dApp connector via
-  `CIP30Provider`), CIP-119 (DRep metadata).
+  fingerprints), CIP-25 v1 + v2 (NFT metadata; v2 supports byte-keyed asset names for
+  CIP-67/68 prefixed assets), CIP-30 (dApp connector via `CIP30Provider`), CIP-119
+  (DRep metadata).
 - **ADA Handle resolution** — `wallet.sendTo(handle: "$alice", lovelace: 5_000_000)`
   via `swift-handles-api` with a TTL cache.
 - **Two storage backends** — `FileKeyStore` (default) and `KeychainKeyStore`
   (Apple platforms). Optional `SQLiteUTxOStore` behind the `SQLite` package trait.
-- **Sample SwiftUI app** in [`Examples/MnemonicDemo/`](Examples/MnemonicDemo/).
 
 ## Install
 
@@ -59,8 +75,8 @@ To enable the optional SQLite-backed UTxO cache:
 ```swift
 import SwiftCardanoWallet
 
-let wallet = try await MnemonicWallet(
-    mnemonic: phrase,
+let wallet = try await Wallet.mnemonic(
+    phrase: phrase,
     network: .mainnet,
     provider: .blockfrost(projectId: "mainnet…")
 )
@@ -75,9 +91,9 @@ signing — see the [Quick Start article](Sources/SwiftCardanoWallet/SwiftCardan
 | Type | When to use |
 |---|---|
 | `MnemonicWallet` | BIP-39 phrase. The default; HD addresses + auto sign. |
-| `EncryptedKeyManager` (wraps Mnemonic) | Persist a passphrase-encrypted blob. PBKDF2-SHA512 → AES-256-GCM. |
-| `TextEnvelopeKeyManager` | Existing `cardano-cli` `.skey` files. |
-| `WatchOnlyKeyManager` | Public keys / addresses only. Useful for monitoring. |
+| `Wallet.encrypted(blob:passphrase:...)` | Recover a wallet from a persisted `EncryptedBlob`. PBKDF2-SHA512 → AES-256-GCM. Returns a `.mnemonic(_:)` case after decryption. |
+| `TextEnvelopeWallet` | Existing `cardano-cli` `.skey` files. Full send + sign. |
+| `WatchOnlyWallet` | Verification keys **or just an address**. `prepareSend` builds; `sign()` throws `watchOnly` — pair with offline signing. Stake addresses (`stake1…`) are also accepted for reward / delegation monitoring. |
 | `MultisigWallet` | Native-script multisig (N-of-M, all, any). Coordinator collects partial witnesses from cosigners and assembles. |
 | `HardwareWallet` | Ledger / Trezor via `cardano-hw-cli`. macOS + Linux only (iOS traps with `unsupportedOperation`). |
 
@@ -87,30 +103,47 @@ for construction examples and trade-offs.
 ## Operations cheat sheet
 
 ```swift
+// --- Available on the `Wallet` enum directly ---
+
 // Read
-let balance = try await wallet.balance()        // ADA + multi-asset + rewards
-let address = try await wallet.receiveAddress()
-let utxos   = try await wallet.utxos()
+let balance  = try await wallet.balance()              // ADA + multi-asset + rewards
+let address  = try await wallet.primaryAddress()       // receive (mnemonic) / script (multisig) / etc.
+let utxos    = try await wallet.utxos()
+let canSign  = wallet.canSign                          // false for .watchOnly
 
 // Send
 try await wallet.send(lovelace: 5_000_000, to: addr)
 try await wallet.sendTo(handle: "$alice", lovelace: 5_000_000)
 
-// Stake
-try await wallet.registerStake()
-try await wallet.delegate(toPool: poolId)
-try await wallet.claimAllRewards()
+// --- Stake / mint / governance live on `MnemonicWallet` ---
+// (Multisig / hardware have their own multi-step flows; drop down via the typed accessor.)
 
-// Mint (native script policy + CIP-25 v1 NFT)
-try await wallet.mintNFT(metadata: cip25, policy: policy)
+guard let m = wallet.mnemonicWallet else { return }
+
+// Stake
+try await m.registerStake()
+try await m.delegate(toPool: poolId)
+try await m.claimAllRewards()
+
+// Mint — native script (one-shot NFT)
+try await m.mintNFT(name: "MyNFT", metadata: cip25)         // CIP-25 v1 default
+let v2 = metadata.encode(policyId: pid, assetName: "MyNFT", version: .v2)
+
+// Mint — Plutus policy
+try await m.mint(
+    amount: 1,
+    assetName: "MyToken",
+    plutusPolicy: .plutusV2Script(PlutusV2Script(data: compiledScript))
+    // `redeemer:` defaults to a Unit redeemer; `collateral:` auto-picked from UTxOs
+)
 
 // Governance
-try await wallet.delegateVote(to: .alwaysAbstain)
-try await wallet.vote(on: govActionId, vote: .yes)
+try await m.delegateVote(to: .alwaysAbstain)
+try await m.vote(on: govActionId, vote: .yes)
 ```
 
-For multi-action transactions, build with `prepareSend(...)` / `prepareDelegate(...)` etc.
-and chain the `PreparedTransaction`s manually — see the [Operations article](Sources/SwiftCardanoWallet/SwiftCardanoWallet.docc/Articles/Operations.md).
+For multi-action transactions, build with `prepareSend(...)` / `prepareMint(...)` / etc.
+on the concrete actor and chain the resulting `PreparedTransaction`s manually.
 
 ## Documentation
 
@@ -127,12 +160,12 @@ it isn't a direct dep.)
 ## Status
 
 Currently at parity with [TokeoPay/CardanoKit](https://github.com/TokeoPay/CardanoKit) plus
-the full `swift-cardano-txbuilder` shortcut surface. **163 hermetic tests
-(170 with the SQLite trait) — all green.**
+the full `swift-cardano-txbuilder` shortcut surface, **Plutus V1/V2/V3 minting**, and
+**CIP-25 v2** NFT metadata. **204 hermetic tests (211 with the SQLite trait) — all green.**
 
 See [`.agents/PLAN.md`](.agents/PLAN.md) for the full build sequence, dependencies, and
-known follow-ups (Plutus minting, CIP-25 v2, Ogmios chain-sync, mixed software/hardware
-signing).
+known follow-ups (Ogmios chain-sync, mixed software/hardware signing, verified Plutus
+script fixtures for end-to-end auto-estimate testing).
 
 ## Requirements
 

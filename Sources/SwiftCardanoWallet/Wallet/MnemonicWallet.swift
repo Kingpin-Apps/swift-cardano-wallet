@@ -8,7 +8,7 @@ import SwiftCardanoChain
 /// roles up to a configurable gap limit (default 20). The first call to ``utxos()`` /
 /// ``balance()`` triggers the initial sweep; subsequent calls return the cached snapshot.
 /// Force a refresh with ``refresh()`` (e.g. after submitting a tx).
-public actor MnemonicWallet: Wallet {
+public actor MnemonicWallet: WalletProtocol {
 
     public nonisolated let network: Network
     public nonisolated let account: Account

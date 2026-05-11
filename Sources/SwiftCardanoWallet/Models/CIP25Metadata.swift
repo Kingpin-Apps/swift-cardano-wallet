@@ -5,6 +5,18 @@ import SwiftCardanoCore
 /// CIP-25 (NFT Metadata) reference label.
 public let CIP25_METADATA_LABEL: TransactionMetadatumLabel = 721
 
+/// Which version of CIP-25 to emit.
+///
+/// - ``v1``: asset names keyed as **text** strings (`assetName: String` is UTF-8 decoded
+///   on chain). Backwards-compatible with old wallets; works for ASCII names ≤ 32 bytes.
+/// - ``v2``: asset names keyed as **byte strings**. Required for non-ASCII names or
+///   asset-name representations that don't round-trip through UTF-8. Top-level metadata
+///   carries `"version": 2`.
+public enum CIP25Version: Int, Sendable, Equatable {
+    case v1 = 1
+    case v2 = 2
+}
+
 /// Single file referenced by a CIP-25 NFT (e.g. extra resolutions, video, etc.).
 public struct CIP25File: Sendable, Equatable {
     public var name: String
@@ -48,21 +60,70 @@ public struct CIP25NFTMetadata: Sendable, Equatable {
         self.extras = extras
     }
 
-    /// Serialize this NFT metadata into the canonical CIP-25 envelope:
+    /// Serialize this NFT metadata into the canonical CIP-25 envelope. Defaults to
+    /// **v1** for backwards compatibility — pass `version: .v2` for non-ASCII asset names
+    /// or wallets that require the v2 byte-keyed asset map.
+    ///
+    /// **v1 shape:**
     /// ```
     /// {
-    ///   "<policy_id_hex>": {
-    ///     "<asset_name_utf8>": {
-    ///       "name": "...",
-    ///       "image": "...",
-    ///       ...
-    ///     }
-    ///   },
+    ///   "<policy_id_hex>": { "<asset_name_utf8>": { "name": "...", "image": "...", ... } },
     ///   "version": 1
     /// }
     /// ```
-    /// Returned as a `TransactionMetadatum` ready to be placed under label `721` in a `Metadata` map.
-    public func encode(policyId: ScriptHash, assetName: String) -> TransactionMetadatum {
+    ///
+    /// **v2 shape:**
+    /// ```
+    /// {
+    ///   "<policy_id_hex>": { <asset_name_bytes>: { "name": "...", "image": "...", ... } },
+    ///   "version": 2
+    /// }
+    /// ```
+    ///
+    /// Returned as a `TransactionMetadatum` ready to be placed under label `721` in a
+    /// `Metadata` map.
+    public func encode(
+        policyId: ScriptHash,
+        assetName: String,
+        version: CIP25Version = .v1
+    ) -> TransactionMetadatum {
+        // v2 keys asset names by raw bytes; we accept a `String` and decode as UTF-8.
+        // For non-UTF-8 / pre-encoded asset names use ``encode(policyId:assetNameBytes:version:)``.
+        let assetKey: TransactionMetadatum
+        switch version {
+        case .v1: assetKey = .text(assetName)
+        case .v2: assetKey = .bytes(Data(assetName.utf8))
+        }
+        return encode(
+            policyId: policyId,
+            assetKey: assetKey,
+            version: version
+        )
+    }
+
+    /// Variant of ``encode(policyId:assetName:version:)`` that takes a raw byte asset
+    /// name. Used for **v2** when the on-chain asset name isn't a UTF-8 string
+    /// (e.g. CIP-67 / CIP-68 prefixed assets). Forces `version: .v2` if `.v1` is passed
+    /// with bytes — v1 doesn't support byte-keyed asset names.
+    public func encode(
+        policyId: ScriptHash,
+        assetNameBytes: Data,
+        version: CIP25Version = .v2
+    ) -> TransactionMetadatum {
+        return encode(
+            policyId: policyId,
+            assetKey: .bytes(assetNameBytes),
+            version: .v2  // bytes ⇒ always v2
+        )
+    }
+
+    // MARK: - Internals
+
+    private func encode(
+        policyId: ScriptHash,
+        assetKey: TransactionMetadatum,
+        version: CIP25Version
+    ) -> TransactionMetadatum {
         var asset: OrderedDictionary<TransactionMetadatum, TransactionMetadatum> = [:]
         asset[.text("name")] = .text(name)
         asset[.text("image")] = .text(image)
@@ -85,11 +146,11 @@ public struct CIP25NFTMetadata: Sendable, Equatable {
         }
 
         var policyMap: OrderedDictionary<TransactionMetadatum, TransactionMetadatum> = [:]
-        policyMap[.text(assetName)] = .map(asset)
+        policyMap[assetKey] = .map(asset)
 
         var top: OrderedDictionary<TransactionMetadatum, TransactionMetadatum> = [:]
         top[.text(policyId.payload.toHex)] = .map(policyMap)
-        top[.text("version")] = .int(1)
+        top[.text("version")] = .int(version.rawValue)
 
         return .map(top)
     }

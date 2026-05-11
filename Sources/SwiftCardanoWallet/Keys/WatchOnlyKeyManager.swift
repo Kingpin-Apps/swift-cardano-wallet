@@ -11,11 +11,16 @@ public struct WatchOnlyKeyManager: KeyManager {
     public let kind: WalletKind = .watchOnly
     public let canSign: Bool = false
 
-    private let paymentVKey: PaymentVerificationKey
+    private let paymentVKey: PaymentVerificationKey?
     private let stakeVKey: StakeVerificationKey?
 
+    /// Construct with one or two verification keys. Pass `nil` to both to build a "blind"
+    /// key manager — useful when ``WatchOnlyWallet`` is being constructed from a raw
+    /// ``SwiftCardanoCore/Address`` and no underlying keys are known. Every method on a
+    /// blind manager throws ``WalletError/unsupportedOperation(_:)`` since there's nothing
+    /// to hand back.
     public init(
-        paymentVerificationKey: PaymentVerificationKey,
+        paymentVerificationKey: PaymentVerificationKey? = nil,
         stakeVerificationKey: StakeVerificationKey? = nil
     ) {
         self.paymentVKey = paymentVerificationKey
@@ -26,6 +31,11 @@ public struct WatchOnlyKeyManager: KeyManager {
         guard path.role == .external || path.role == .change else {
             throw WalletError.unsupportedOperation(
                 "WatchOnlyKeyManager: payment VK requested at role \(path.role)"
+            )
+        }
+        guard let paymentVKey else {
+            throw WalletError.unsupportedOperation(
+                "WatchOnlyKeyManager has no payment verification key (constructed from an address only)."
             )
         }
         return paymentVKey
