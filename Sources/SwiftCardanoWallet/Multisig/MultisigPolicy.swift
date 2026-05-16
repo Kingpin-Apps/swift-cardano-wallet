@@ -151,9 +151,20 @@ public struct MultisigPolicy: Sendable, Equatable {
         }
     }
 
-    /// Heuristic: how many cosigners the policy *requires* before a transaction will validate
-    /// on-chain. Used by `MultisigWallet.prepareSend(...)` to set a conservative
-    /// `witnessOverride` for fee estimation.
+    /// Heuristic estimate of how many cosigner witnesses a transaction will need before
+    /// it validates on-chain. Used by `MultisigWallet.prepareSend(...)` to set a
+    /// conservative `witnessOverride` for fee estimation.
+    ///
+    /// **This is for fee math, not enforcement.** The estimate:
+    ///
+    /// - Picks the cheapest satisfying branch of `ScriptAny` / `ScriptNofK` — a real
+    ///   signing flow may use a more expensive branch, costing more witnesses than this
+    ///   reports.
+    /// - **Ignores `invalidBefore` / `invalidHereAfter` validity windows.** A policy
+    ///   that's currently active vs. expired produces the same count. Callers that need
+    ///   to refuse spends outside a policy's validity window must check that
+    ///   themselves before submitting; combining ``PartialWitness``es and broadcasting
+    ///   an out-of-window transaction will get rejected by the chain, not by this code.
     public func requiredSignerCount() -> Int {
         Self.requiredCount(for: nativeScript)
     }

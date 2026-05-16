@@ -43,8 +43,9 @@ For richer flows, extract the concrete actor via `wallet.mnemonicWallet`,
   `ProviderConfig`.
 - **CIP support** — CIP-1852 (HD), CIP-8 (message signing), CIP-14 (asset
   fingerprints), CIP-25 v1 + v2 (NFT metadata; v2 supports byte-keyed asset names for
-  CIP-67/68 prefixed assets), CIP-30 (dApp connector via `CIP30Provider`), CIP-119
-  (DRep metadata).
+  CIP-67/68 prefixed assets), CIP-30 (dApp connector via
+  `wallet.cip30Provider(info:policy:)` — every signing op is gated on a required
+  `CIP30ApprovalPolicy`), CIP-119 (DRep metadata).
 - **ADA Handle resolution** — `wallet.sendTo(handle: "$alice", lovelace: 5_000_000)`
   via `swift-handles-api` with a TTL cache.
 - **Two storage backends** — `FileKeyStore` (default) and `KeychainKeyStore`
@@ -145,6 +146,48 @@ try await m.vote(on: govActionId, vote: .yes)
 For multi-action transactions, build with `prepareSend(...)` / `prepareMint(...)` / etc.
 on the concrete actor and chain the resulting `PreparedTransaction`s manually.
 
+## Connecting a dApp (CIP-30)
+
+```swift
+import SwiftCardanoCIPs
+
+let provider = try await wallet.mnemonicWallet!.cip30Provider(
+    info: WalletInfo(name: "MyWallet", icon: "data:image/png;base64,…"),
+    policy: CIP30ApprovalPolicy(
+        approveSignTx:   { tx, _, ctx in await ui.confirmSignTx(tx, origin: ctx?.origin) },
+        approveSignData: { addr, payload, ctx in await ui.confirmSignData(addr, payload, origin: ctx?.origin) },
+        approveSubmitTx: { _, ctx in await ui.confirmSubmit(origin: ctx?.origin) }
+    )
+)
+```
+
+The returned `KeyStoreCIP30Provider` is the upstream reference implementation from
+`swift-cardano-cips`. Every `signTx` / `signData` / `submitTx` call invokes the matching
+approval closure first — there's no "always allow" backdoor. `partialSign: false` is
+real: the provider checks required-signer hashes against the wallet's keys and throws
+`TxSignError.proofGeneration` when any are missing. `signData` uses raw byte payloads
+(no UTF-8 transcoding), so signing arbitrary bytes is well-defined.
+
+Use `CIP30ApprovalPolicy.denyAll` as a safe placeholder during development; never ship
+`.allowAll` — it's only for test harnesses.
+
+## Security defaults
+
+- **Mnemonic encryption.** `EncryptedKeyManager` → PBKDF2-HMAC-SHA512 (210,000 iters by
+  default; 100k floor enforced on decrypt to reject tampered blobs) → AES-256-GCM via
+  CryptoKit. Passphrase is NFKC-normalized before key derivation so composed vs
+  decomposed accented characters produce the same key across devices.
+- **Blob format.** v2 (current) uses a CBOR-map plaintext so future fields can be added
+  without ambiguity. v1 (`\n`-delimited) blobs still decrypt — re-saving migrates them
+  to v2.
+- **On-disk permissions.** `FileKeyStore` chmods newly-created vault directories to
+  `0o700` and every saved blob to `0o600` regardless of process umask.
+- **Heap residue.** PBKDF2-derived keys and decrypted plaintext are zeroed via
+  `memset_s` after use (best-effort defense-in-depth; see `Data.zeroize()` for the
+  caveats).
+- **dApp consent.** CIP-30 surface is gated on a required `CIP30ApprovalPolicy` — see
+  the section above.
+
 ## Documentation
 
 DocC catalog ships in [`Sources/SwiftCardanoWallet/SwiftCardanoWallet.docc/`](Sources/SwiftCardanoWallet/SwiftCardanoWallet.docc/).
@@ -161,7 +204,7 @@ it isn't a direct dep.)
 
 Currently at parity with [TokeoPay/CardanoKit](https://github.com/TokeoPay/CardanoKit) plus
 the full `swift-cardano-txbuilder` shortcut surface, **Plutus V1/V2/V3 minting**, and
-**CIP-25 v2** NFT metadata. **204 hermetic tests (211 with the SQLite trait) — all green.**
+**CIP-25 v2** NFT metadata. **220 hermetic tests (227 with the SQLite trait) — all green.**
 
 See [`.agents/PLAN.md`](.agents/PLAN.md) for the full build sequence, dependencies, and
 known follow-ups (Ogmios chain-sync, mixed software/hardware signing, verified Plutus

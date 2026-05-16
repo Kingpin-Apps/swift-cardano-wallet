@@ -244,18 +244,3 @@ public actor TextEnvelopeKeyManager: KeyManager {
     }
 }
 
-private extension Data {
-    init?(hexString: String) {
-        let s = hexString.lowercased()
-        guard s.count % 2 == 0 else { return nil }
-        var out = Data(capacity: s.count / 2)
-        var idx = s.startIndex
-        while idx < s.endIndex {
-            let next = s.index(idx, offsetBy: 2)
-            guard let byte = UInt8(s[idx..<next], radix: 16) else { return nil }
-            out.append(byte)
-            idx = next
-        }
-        self = out
-    }
-}

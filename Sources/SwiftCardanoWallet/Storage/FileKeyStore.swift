@@ -5,15 +5,27 @@ public actor FileKeyStore: KeyStore {
 
     public let directory: URL
 
-    /// Creates the directory if it doesn't already exist.
+    /// Creates the directory if it doesn't already exist. Newly-created directories are
+    /// chmod'd to `0o700` (owner read/write/execute, group/other none) so the encrypted
+    /// blobs inside aren't world-readable on a multi-user machine. Existing directories
+    /// are left untouched — the caller already chose their own permissions for those.
     public init(directory: URL, createIfMissing: Bool = true) throws {
         self.directory = directory
         if createIfMissing {
+            let alreadyExisted = FileManager.default.fileExists(atPath: directory.path)
             try FileManager.default.createDirectory(
                 at: directory,
                 withIntermediateDirectories: true,
                 attributes: nil
             )
+            if !alreadyExisted {
+                #if !os(Windows)
+                try? FileManager.default.setAttributes(
+                    [.posixPermissions: 0o700],
+                    ofItemAtPath: directory.path
+                )
+                #endif
+            }
         } else {
             var isDir: ObjCBool = false
             guard
@@ -34,6 +46,15 @@ public actor FileKeyStore: KeyStore {
         } catch {
             throw WalletError.keystore("Cannot write \(url.path): \(error)")
         }
+        // Set 0o600 every time, not only on first write — atomic writes rename a temp
+        // file over the target, so the resulting inode may have just-created
+        // (umask-dependent) permissions even when the previous file was already 0o600.
+        #if !os(Windows)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: url.path
+        )
+        #endif
     }
 
     public func load(id: String) async throws -> EncryptedBlob {

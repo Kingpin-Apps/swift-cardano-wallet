@@ -71,6 +71,24 @@ let wallet = try await Wallet.encrypted(
 PBKDF2-HMAC-SHA512 (210,000 iterations by default) → AES-256-GCM, via CryptoKit. Pair
 with ``KeychainKeyStore`` (Apple) or ``FileKeyStore`` (cross-platform JSON-on-disk).
 
+**Security details:**
+
+- The passphrase is **NFKC-normalized** before key derivation, so a passphrase typed
+  with composed `é` (one code point) decrypts a blob encrypted with the decomposed form
+  (`e` + combining acute, two code points). Matches BIP-39's own normalization rule.
+- ``EncryptedBlob`` is currently at **version 2** — plaintext is a CBOR map, robust to
+  passphrases containing newlines and to future field additions. **Version 1**
+  (`\n`-delimited plaintext) is still decryptable; re-saving migrates the blob in place.
+- ``EncryptedKeyManager`` rejects blobs with `iterations < 100,000` on decrypt, even if
+  the cipher would happily authenticate — defends against a tampered blob whose
+  iteration count was rewritten to something trivially crackable.
+- Derived keys and decrypted plaintext are wiped via `memset_s` after use as
+  defense-in-depth (see `Data.zeroize()` for the caveats — ARC copies elsewhere in
+  the process aren't reached).
+- ``FileKeyStore`` chmods newly-created vault directories to `0o700` and every saved
+  blob to `0o600` regardless of process umask. Existing directories supplied to
+  ``FileKeyStore/init(directory:createIfMissing:)`` are left untouched.
+
 ## TextEnvelope (`cardano-cli` `.skey` files)
 
 ```swift

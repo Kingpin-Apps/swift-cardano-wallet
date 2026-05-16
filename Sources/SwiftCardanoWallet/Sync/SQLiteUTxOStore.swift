@@ -168,12 +168,4 @@ public actor SQLiteUTxOStore: UTxOStore {
     }
 }
 
-// MARK: - Local helpers
-
-private extension Data {
-    var toHex: String {
-        map { String(format: "%02x", $0) }.joined()
-    }
-}
-
 #endif

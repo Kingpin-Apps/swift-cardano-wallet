@@ -1,7 +1,14 @@
 import Foundation
 import CryptoKit
 import Security
+import OrderedCollections
 import SwiftCardanoCore
+
+/// Minimum PBKDF2 iteration count we will accept on decrypt. Roughly half the
+/// recommended default — gives us headroom to lower the default in a future release
+/// without bricking blobs already in the wild, while still rejecting a tampered blob
+/// whose `iterations` field was rewritten to something trivially crackable.
+private let minDecryptIterations: Int = 100_000
 
 /// Wraps a ``MnemonicKeyManager`` with passphrase-based encryption.
 ///
@@ -56,16 +63,23 @@ public actor EncryptedKeyManager: KeyManager {
         guard !passphrase.isEmpty else {
             throw WalletError.invalidPassphrase
         }
+        guard iterations >= minDecryptIterations else {
+            throw WalletError.keystore(
+                "PBKDF2 iterations \(iterations) below minimum \(minDecryptIterations)"
+            )
+        }
         self.mnemonicPlaintext = mnemonic
         self.bip39PassphrasePlaintext = bip39Passphrase
         self.iterations = iterations
         self.inner = try MnemonicKeyManager(mnemonic: mnemonic, passphrase: bip39Passphrase)
     }
 
-    /// Create by decrypting a stored blob.
+    /// Create by decrypting a stored blob. Accepts both format ``EncryptedBlob/currentVersion``
+    /// and the legacy v1 (`\n`-delimited plaintext).
     public init(blob: EncryptedBlob, passphrase: String) async throws {
         guard !passphrase.isEmpty else { throw WalletError.invalidPassphrase }
-        guard blob.version == EncryptedBlob.currentVersion else {
+        guard blob.version >= EncryptedBlob.minSupportedVersion,
+              blob.version <= EncryptedBlob.currentVersion else {
             throw WalletError.keystore("Unsupported blob version \(blob.version)")
         }
         guard blob.kdf == EncryptedBlob.kdfPbkdf2SHA512 else {
@@ -79,6 +93,13 @@ public actor EncryptedKeyManager: KeyManager {
                 "Unsupported innerKind '\(blob.innerKind)' (only '\(EncryptedKeyManager.innerKindMnemonic)' is wired up)"
             )
         }
+        // Reject blobs with implausibly low iteration counts even if the cipher would
+        // happily decrypt — a tampered blob with iterations=1 is a brute-force tee-up.
+        guard blob.iterations >= minDecryptIterations else {
+            throw WalletError.keystore(
+                "Blob iterations \(blob.iterations) below minimum \(minDecryptIterations)"
+            )
+        }
         guard
             let salt = Data(base64Encoded: blob.saltBase64),
             let nonceData = Data(base64Encoded: blob.nonceBase64),
@@ -88,15 +109,18 @@ public actor EncryptedKeyManager: KeyManager {
             throw WalletError.keystore("Blob contains malformed base64 fields")
         }
 
-        let derivedKey = PBKDF2.deriveKeySHA512(
-            password: Data(passphrase.utf8),
+        var passphraseBytes = Self.normalizedPassphraseBytes(passphrase)
+        var derivedKey = PBKDF2.deriveKeySHA512(
+            password: passphraseBytes,
             salt: salt,
             iterations: blob.iterations,
             keyLength: EncryptedKeyManager.keyLength
         )
+        passphraseBytes.zeroize()
+        defer { derivedKey.zeroize() }
         let symKey = SymmetricKey(data: derivedKey)
 
-        let plaintext: Data
+        var plaintext: Data
         do {
             let nonce = try AES.GCM.Nonce(data: nonceData)
             let sealed = try AES.GCM.SealedBox(nonce: nonce, ciphertext: ciphertext, tag: tag)
@@ -104,14 +128,16 @@ public actor EncryptedKeyManager: KeyManager {
         } catch {
             throw WalletError.invalidPassphrase
         }
+        defer { plaintext.zeroize() }
 
-        // The plaintext is `<mnemonic>\n<bip39Passphrase>` (passphrase may be empty).
-        let raw = String(decoding: plaintext, as: UTF8.self)
-        let parts = raw.components(separatedBy: "\n")
-        guard let phrase = parts.first else {
-            throw WalletError.keystore("Decrypted blob is malformed")
+        let phrase: String
+        let bip39: String
+        switch blob.version {
+        case 1:
+            (phrase, bip39) = try Self.decodePlaintextV1(plaintext)
+        default:
+            (phrase, bip39) = try Self.decodePlaintextV2(plaintext)
         }
-        let bip39 = parts.count > 1 ? parts.dropFirst().joined(separator: "\n") : ""
 
         self.mnemonicPlaintext = phrase
         self.bip39PassphrasePlaintext = bip39
@@ -121,26 +147,34 @@ public actor EncryptedKeyManager: KeyManager {
 
     // MARK: - Export
 
-    /// Re-encrypt the wrapped mnemonic with the given passphrase, producing a storable blob.
+    /// Re-encrypt the wrapped mnemonic with the given passphrase, producing a storable
+    /// blob in the current format (``EncryptedBlob/currentVersion``).
     public func encryptedBlob(passphrase: String) throws -> EncryptedBlob {
         guard !passphrase.isEmpty else { throw WalletError.invalidPassphrase }
 
         let salt = Self.randomBytes(EncryptedKeyManager.saltLength)
-        let derivedKey = PBKDF2.deriveKeySHA512(
-            password: Data(passphrase.utf8),
+        var passphraseBytes = Self.normalizedPassphraseBytes(passphrase)
+        var derivedKey = PBKDF2.deriveKeySHA512(
+            password: passphraseBytes,
             salt: salt,
             iterations: iterations,
             keyLength: EncryptedKeyManager.keyLength
         )
+        passphraseBytes.zeroize()
+        defer { derivedKey.zeroize() }
         let symKey = SymmetricKey(data: derivedKey)
         let nonceData = Self.randomBytes(EncryptedKeyManager.nonceLength)
         let nonce = try AES.GCM.Nonce(data: nonceData)
-        var plaintext = Data(mnemonicPlaintext.utf8)
-        plaintext.append(0x0a)  // \n
-        plaintext.append(Data(bip39PassphrasePlaintext.utf8))
+
+        var plaintext = try Self.encodePlaintextV2(
+            mnemonic: mnemonicPlaintext,
+            bip39Passphrase: bip39PassphrasePlaintext
+        )
+        defer { plaintext.zeroize() }
 
         let sealed = try AES.GCM.seal(plaintext, using: symKey, nonce: nonce)
         return EncryptedBlob(
+            version: EncryptedBlob.currentVersion,
             iterations: iterations,
             saltBase64: salt.base64EncodedString(),
             nonceBase64: nonceData.base64EncodedString(),
@@ -178,5 +212,80 @@ public actor EncryptedKeyManager: KeyManager {
         }
         precondition(result == errSecSuccess, "SecRandomCopyBytes failed: \(result)")
         return bytes
+    }
+
+    /// NFKC-normalize the passphrase before feeding it to PBKDF2. Matches BIP-39's own
+    /// normalization rule for the wallet passphrase: a user who typed `café` with a
+    /// composed `é` on one device must derive the same key on a device that decomposes
+    /// the accent. Applied symmetrically in encrypt + decrypt.
+    static func normalizedPassphraseBytes(_ passphrase: String) -> Data {
+        Data(passphrase.precomposedStringWithCompatibilityMapping.utf8)
+    }
+
+    // MARK: - Plaintext format
+
+    // Short keys keep the encrypted payload compact (extra bytes don't hurt security but
+    // bloat every saved blob). Treat as wire constants — never rename.
+    private static let v2KeyMnemonic: String = "m"
+    private static let v2KeyPassphrase: String = "p"
+
+    /// v2 plaintext: CBOR map `{"m": <mnemonic>, "p": <bip39_passphrase>}`. Map shape
+    /// means a future field can be added without ambiguity, and an embedded newline in
+    /// the passphrase can't break the parse the way the v1 `\n`-delimited format did.
+    static func encodePlaintextV2(mnemonic: String, bip39Passphrase: String) throws -> Data {
+        var map: OrderedDictionary<Primitive, Primitive> = [:]
+        map[.string(v2KeyMnemonic)] = .string(mnemonic)
+        map[.string(v2KeyPassphrase)] = .string(bip39Passphrase)
+        do {
+            return try Primitive.orderedDict(map).toCBORData()
+        } catch {
+            throw WalletError.keystore("Failed to encode v2 plaintext: \(error)")
+        }
+    }
+
+    static func decodePlaintextV2(_ plaintext: Data) throws -> (mnemonic: String, bip39Passphrase: String) {
+        let primitive: Primitive
+        do {
+            primitive = try Primitive.fromCBOR(data: plaintext)
+        } catch {
+            throw WalletError.keystore("Decrypted v2 plaintext is not valid CBOR: \(error)")
+        }
+        // Accept either ordered or unordered map — the CBOR codec can round-trip into
+        // either depending on canonicalization choices.
+        let entries: [(Primitive, Primitive)]
+        switch primitive {
+        case .orderedDict(let m): entries = Array(m)
+        case .dict(let m): entries = Array(m)
+        case .indefiniteDictionary(let m): entries = Array(m)
+        case .frozenDict(let m): entries = Array(m)
+        default:
+            throw WalletError.keystore("Decrypted v2 plaintext is not a map")
+        }
+        var mnemonic: String?
+        var bip39: String = ""
+        for (key, value) in entries {
+            guard case .string(let k) = key, case .string(let v) = value else { continue }
+            switch k {
+            case v2KeyMnemonic:    mnemonic = v
+            case v2KeyPassphrase:  bip39 = v
+            default: break  // forward-compat: ignore unknown fields
+            }
+        }
+        guard let phrase = mnemonic else {
+            throw WalletError.keystore("v2 plaintext missing required field '\(v2KeyMnemonic)'")
+        }
+        return (phrase, bip39)
+    }
+
+    /// Legacy v1 plaintext: `<mnemonic>\n<bip39_passphrase>` (UTF-8, may be empty
+    /// passphrase). Kept so blobs written by older builds still open.
+    static func decodePlaintextV1(_ plaintext: Data) throws -> (mnemonic: String, bip39Passphrase: String) {
+        let raw = String(decoding: plaintext, as: UTF8.self)
+        let parts = raw.components(separatedBy: "\n")
+        guard let phrase = parts.first else {
+            throw WalletError.keystore("v1 plaintext is empty")
+        }
+        let bip39 = parts.count > 1 ? parts.dropFirst().joined(separator: "\n") : ""
+        return (phrase, bip39)
     }
 }

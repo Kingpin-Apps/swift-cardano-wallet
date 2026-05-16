@@ -3,221 +3,81 @@ import SwiftCardanoCore
 import SwiftCardanoChain
 import SwiftCardanoCIPs
 
-/// `CIP30Provider` conformance for ``MnemonicWallet``.
+/// Build a CIP-30 provider for a ``MnemonicWallet``.
 ///
-/// This is the language-agnostic surface from the spec. Hosts (iOS dApp browsers, native
-/// in-app dApp UIs, etc.) bridge / proxy these methods however they prefer; this file does
-/// not ship a webview or JS bridge.
+/// `swift-cardano-cips` ships a reference ``KeyStoreCIP30Provider`` that handles the spec
+/// details correctly:
+/// - Gates `signTx`, `signData`, and `submitTx` on a ``CIP30ApprovalPolicy`` so a connected
+///   dApp can't sign arbitrary transactions without user consent.
+/// - Honours `partialSign: false` by checking required-signer hashes against the wallet's
+///   keys and throwing ``TxSignError/proofGeneration(_:)`` when any are missing.
+/// - Signs CIP-8 payloads as raw bytes via ``SwiftCardanoCIPs/CIP8/sign(payload:signingKey:attachCoseKey:network:)`` —
+///   no UTF-8 transcoding, so the signed message is exactly what the dApp supplied.
+/// - Emits the stake-key witness only when the transaction body actually needs it.
 ///
-/// Notes on the v0.1 implementation:
-/// - `getUtxos` ignores `amount` (no pre-filtering) and applies a coarse `paginate` slice.
-/// - `getCollateral` returns the default `nil` (no Plutus support yet).
-/// - `getUsedAddresses` returns every address the ``BalanceTracker`` knows about that has
-///   ever had a UTxO; `getUnusedAddresses` returns the receive + change addresses at index 0
-///   so dApps have a deterministic destination to send funds to.
-/// - `signTx` signs with the wallet's role-0 payment key only (same shortcut as `Send.swift`).
-///   Multi-address / required-signer-aware signing is a follow-up.
-/// - `signData` is wired through the CIP-8 helper in `swift-cardano-cips`.
-extension MnemonicWallet: CIP30Provider {
+/// This file wires the wallet's role-0 payment + stake keys into that provider and adapts
+/// the wallet's underlying ``SwiftCardanoChain/ChainContext`` to ``CIP30DataSource``.
+///
+/// **Surface scope.** The returned provider is single-address: only the role-0 / index-0
+/// derivation is exposed via `getUsedAddresses` / `getChangeAddress`. Other addresses the
+/// wallet's ``BalanceTracker`` may know about (gap-limit sweep) are deliberately hidden
+/// from dApps; CIP-30 is the external surface, not the wallet's internal HD view.
+extension MnemonicWallet {
 
-    public func getNetworkId() async throws -> Int {
-        network.networkId.rawValue
-    }
-
-    public func getUtxos(amount: Data?, paginate: Paginate?) async throws -> [Data]? {
-        let utxos = try await self.utxos()
-        guard !utxos.isEmpty else { return nil }
-        let slice: [UTxO]
-        if let p = paginate {
-            let limit = Int(p.limit)
-            let start = Int(p.page) * limit
-            let end = min(utxos.count, start + limit)
-            slice = start < end ? Array(utxos[start..<end]) : []
-        } else {
-            slice = utxos
-        }
+    /// Build a CIP-30 provider scoped to this wallet's role-0 keys.
+    ///
+    /// - Parameters:
+    ///   - info: Wallet metadata advertised via the initial API (name, icon, version).
+    ///   - policy: Per-operation approval gate. Required — no default. Use
+    ///     ``SwiftCardanoCIPs/CIP30ApprovalPolicy/denyAll`` as a safe placeholder, or
+    ///     ``SwiftCardanoCIPs/CIP30ApprovalPolicy/allowAll`` for tests and developer harnesses.
+    ///   - dataSource: Optional explicit ``CIP30DataSource``. Defaults to an in-process
+    ///     adapter over the wallet's ``MnemonicWallet/chainContextHandle()``.
+    ///   - grantedExtensions: Extensions the provider should advertise via `getExtensions()`.
+    /// - Returns: A ``SwiftCardanoCIPs/KeyStoreCIP30Provider`` ready to be bridged to a dApp.
+    public func cip30Provider(
+        info: WalletInfo,
+        policy: CIP30ApprovalPolicy,
+        dataSource: CIP30DataSource? = nil,
+        grantedExtensions: [Extension] = []
+    ) async throws -> KeyStoreCIP30Provider {
+        let paymentSkey = try await keyManager.paymentSigningKeyType(
+            at: account.paymentPath(role: .external, index: 0)
+        )
+        // Stake key is optional — wallets without a stake key still produce a usable
+        // CIP-30 provider, just without reward-address support.
+        let stakeSkey: SigningKeyType?
         do {
-            return try slice.map { try $0.toCBORData() }
+            stakeSkey = try await keyManager.stakeSigningKeyType(at: account.stakePath())
         } catch {
-            throw APIError.internalError("Failed to CBOR-encode UTxOs: \(error)")
-        }
-    }
-
-    public func getBalance() async throws -> Data {
-        let bal = try await self.balance()
-        let value = Value(coin: bal.lovelace, multiAsset: bal.multiAsset)
-        do {
-            return try value.toCBORData()
-        } catch {
-            throw APIError.internalError("Failed to CBOR-encode balance Value: \(error)")
-        }
-    }
-
-    public func getUsedAddresses(paginate: Paginate?) async throws -> [Data] {
-        // Trigger a tracker refresh so the snapshot is hot, then list addresses
-        // with at least one UTxO.
-        _ = try await self.utxos()
-        let tracker = self.balanceTracker()
-        let allAddresses = try await tracker.allTrackedAddresses()
-        let used: [Address] = try await {
-            var out: [Address] = []
-            for addr in allAddresses {
-                let utxos = try await tracker.utxos(at: addr)
-                if !utxos.isEmpty { out.append(addr) }
-            }
-            return out
-        }()
-
-        let slice: [Address]
-        if let p = paginate {
-            let limit = Int(p.limit)
-            let start = Int(p.page) * limit
-            let end = min(used.count, start + limit)
-            slice = start < end ? Array(used[start..<end]) : []
-        } else {
-            slice = used
-        }
-        do {
-            return try slice.map { try $0.toCBORData() }
-        } catch {
-            throw APIError.internalError("Failed to CBOR-encode used addresses: \(error)")
-        }
-    }
-
-    public func getUnusedAddresses() async throws -> [Data] {
-        // v0.1: just expose receive + change at index 0. A future PR can return the
-        // full gap-limit tail of empty addresses.
-        let receive = try await self.receiveAddress()
-        let change = try await self.changeAddress()
-        do {
-            return [try receive.toCBORData(), try change.toCBORData()]
-        } catch {
-            throw APIError.internalError("Failed to CBOR-encode unused addresses: \(error)")
-        }
-    }
-
-    public func getChangeAddress() async throws -> Data {
-        do {
-            return try await self.changeAddress().toCBORData()
-        } catch {
-            throw APIError.internalError("Failed to CBOR-encode change address: \(error)")
-        }
-    }
-
-    public func getRewardAddresses() async throws -> [Data] {
-        do {
-            return [try await self.rewardAddress().toCBORData()]
-        } catch {
-            throw APIError.internalError("Failed to CBOR-encode reward address: \(error)")
-        }
-    }
-
-    public func signTx(_ tx: Data, partialSign: Bool) async throws -> Data {
-        let parsed = Transaction(payload: tx, type: nil, description: nil)
-
-        // Sign with the wallet's role-0 payment key. Future work: inspect
-        // `parsed.transactionBody.requiredSigners` and the inputs' addresses to derive the
-        // exact set of keys we should sign with.
-        let path = self.account.paymentPath(role: .external, index: 0)
-        let skeyType: SigningKeyType
-        do {
-            skeyType = try await self.keyManager.paymentSigningKeyType(at: path)
-        } catch let error as WalletError {
-            if case .watchOnly = error {
-                throw TxSignError.proofGeneration("Watch-only wallet cannot sign")
-            }
-            throw TxSignError.proofGeneration("\(error)")
-        } catch {
-            throw TxSignError.proofGeneration("\(error)")
+            stakeSkey = nil
         }
 
-        let bodyHash = parsed.transactionBody.hash()
-        let signature: Data
-        let vkeyType: VerificationKeyType
-        do {
-            signature = try skeyType.sign(data: bodyHash)
-            vkeyType = try skeyType.toVerificationKeyType()
-        } catch {
-            throw TxSignError.proofGeneration("\(error)")
-        }
+        let resolvedDataSource = dataSource ?? ChainContextDataSource(context: chainContextHandle())
 
-        var witnessSet = TransactionWitnessSet()
-        let witness = VerificationKeyWitness(vkey: vkeyType, signature: signature)
-        witnessSet.vkeyWitnesses = .nonEmptyOrderedSet(NonEmptyOrderedSet([witness]))
-
-        if !partialSign {
-            // We can't currently prove we covered every required signer. Honour partialSign=false
-            // by trusting the caller — they wanted whatever witnesses we can produce.
-        }
-
-        do {
-            return try witnessSet.toCBORData()
-        } catch {
-            throw TxSignError.proofGeneration("Failed to CBOR-encode witness set: \(error)")
-        }
-    }
-
-    public func signData(address: String, payload: Data) async throws -> DataSignature {
-        // Decide whether to sign with the payment or stake key based on the address's role.
-        let addr: Address
-        do {
-            addr = try Address(from: .string(address))
-        } catch {
-            throw DataSignError.proofGeneration("Invalid address: \(error)")
-        }
-
-        let path: DerivationPath
-        if addr.paymentPart != nil {
-            path = self.account.paymentPath(role: .external, index: 0)
-        } else if addr.stakingPart != nil {
-            path = self.account.stakePath()
-        } else {
-            throw DataSignError.addressNotPK("Address has no public-key credential")
-        }
-
-        let skeyType: SigningKeyType
-        do {
-            skeyType = (path.role == .stake)
-                ? try await self.keyManager.stakeSigningKeyType(at: path)
-                : try await self.keyManager.paymentSigningKeyType(at: path)
-        } catch let error as WalletError {
-            if case .watchOnly = error {
-                throw DataSignError.userDeclined("Watch-only wallet cannot sign")
-            }
-            throw DataSignError.proofGeneration("\(error)")
-        } catch {
-            throw DataSignError.proofGeneration("\(error)")
-        }
-
-        let messageString = String(data: payload, encoding: .utf8) ?? payload.toHex
-        let signed: SignedMessage
-        do {
-            signed = try CIP8.sign(
-                message: messageString,
-                signingKey: skeyType,
-                attachCoseKey: true,
-                network: self.network
-            )
-        } catch {
-            throw DataSignError.proofGeneration("CIP-8 signing failed: \(error)")
-        }
-
-        return DataSignature(signature: signed.signature, key: signed.key ?? "")
-    }
-
-    public func submitTx(_ tx: Data) async throws -> String {
-        do {
-            return try await self.chainContextHandle().submitTxCBOR(cbor: tx)
-        } catch {
-            throw TxSendError.failure("\(error)")
-        }
+        return try KeyStoreCIP30Provider(
+            info: info,
+            paymentKey: paymentSkey,
+            stakeKey: stakeSkey,
+            network: network,
+            dataSource: resolvedDataSource,
+            grantedExtensions: grantedExtensions,
+            policy: policy
+        )
     }
 }
 
-// MARK: - Internal helpers
+/// Adapts ``SwiftCardanoChain/ChainContext`` to ``CIP30DataSource`` so any wallet chain
+/// backend (Blockfrost, Koios, Ogmios, offline, custom) automatically works as a CIP-30
+/// data source.
+struct ChainContextDataSource: CIP30DataSource {
+    let context: any ChainContext
 
-private extension Data {
-    var toHex: String {
-        map { String(format: "%02x", $0) }.joined()
+    func utxos(for address: Address) async throws -> [UTxO] {
+        try await context.utxos(address: address)
+    }
+
+    func submit(_ tx: Data) async throws -> String {
+        try await context.submitTxCBOR(cbor: tx)
     }
 }

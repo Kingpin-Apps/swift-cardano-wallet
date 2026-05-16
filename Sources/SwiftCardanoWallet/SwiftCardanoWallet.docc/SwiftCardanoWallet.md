@@ -43,6 +43,7 @@ decrypts an ``EncryptedBlob`` and returns a ``Wallet/mnemonic(_:)`` case.
 
 - <doc:QuickStart>
 - <doc:WalletTypes>
+- <doc:CIP30Provider>
 
 ### Wallet types
 

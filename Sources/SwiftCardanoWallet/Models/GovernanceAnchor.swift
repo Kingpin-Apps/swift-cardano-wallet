@@ -34,18 +34,3 @@ public struct GovernanceAnchor: Sendable, Equatable {
     }
 }
 
-private extension Data {
-    init?(hexString: String) {
-        let s = hexString.lowercased()
-        guard s.count % 2 == 0 else { return nil }
-        var out = Data(capacity: s.count / 2)
-        var i = s.startIndex
-        while i < s.endIndex {
-            let next = s.index(i, offsetBy: 2)
-            guard let b = UInt8(s[i..<next], radix: 16) else { return nil }
-            out.append(b)
-            i = next
-        }
-        self = out
-    }
-}

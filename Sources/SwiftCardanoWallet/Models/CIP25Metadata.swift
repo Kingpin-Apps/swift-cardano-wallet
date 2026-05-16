@@ -156,8 +156,3 @@ public struct CIP25NFTMetadata: Sendable, Equatable {
     }
 }
 
-private extension Data {
-    var toHex: String {
-        map { String(format: "%02x", $0) }.joined()
-    }
-}
