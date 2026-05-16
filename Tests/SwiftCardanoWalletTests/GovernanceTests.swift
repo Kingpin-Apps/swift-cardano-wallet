@@ -35,7 +35,7 @@ struct GovernanceTests {
 
     /// 32-byte transaction hash → GovActionID(index: 0).
     private func sampleGovActionID() throws -> GovActionID {
-        let txId = try TransactionId(payload: Data(repeating: 0xab, count: 32))
+        let txId = TransactionId(payload: Data(repeating: 0xab, count: 32))
         return GovActionID(transactionID: txId, govActionIndex: 0)
     }
 

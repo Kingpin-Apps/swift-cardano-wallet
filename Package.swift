@@ -1,7 +1,5 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
-// Matches `swift-cardano-core` / `swift-cardano-utils`; nothing in this manifest needs 6.3
-// (traits + `.when(traits:)` arrived in 6.1, `swiftLanguageModes` in 6.0).
 
 import PackageDescription
 
@@ -23,13 +21,13 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-core.git", from: "0.3.18"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-chain.git", from: "0.4.0"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git", from: "0.2.9"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txvalidator.git", from: "0.1.9"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-utils.git", from: "0.4.3"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.2.0"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-handles-api.git", from: "0.1.0"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-core.git", from: "0.3.21"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-chain.git", from: "0.4.2"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git", from: "0.2.10"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txvalidator.git", from: "0.1.11"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-utils.git", from: "0.4.6"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.2.2"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-handles-api.git", from: "0.1.1"),
         .package(url: "https://github.com/Kingpin-Apps/swift-gnupg.git", from: "0.1.1"),
         // Provides Crypto-compatible APIs on Linux; on Apple platforms CryptoKit is used.
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.1"),

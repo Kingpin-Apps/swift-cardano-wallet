@@ -13,7 +13,7 @@ private let testMnemonic = "abandon abandon abandon abandon abandon abandon aban
 struct CIP25v2Tests {
 
     private func policyId() throws -> ScriptHash {
-        try ScriptHash(payload: Data(repeating: 0xab, count: 28))
+        ScriptHash(payload: Data(repeating: 0xab, count: 28))
     }
 
     private func sampleMetadata() -> CIP25NFTMetadata {
@@ -342,7 +342,7 @@ struct PlutusMintTests {
             provider: .custom(make: { StubChainContext(networkId: .testnet) })
         )
         let receive = try await probe.receiveAddress()
-        let dummyPolicyId = try ScriptHash(payload: Data(repeating: 0x11, count: 28))
+        let dummyPolicyId = ScriptHash(payload: Data(repeating: 0x11, count: 28))
         let dummyAssetName = AssetName(from: "X")
         let tokenValue = Value(
             coin: 10_000_000,

@@ -197,7 +197,7 @@ struct WatchOnlyKeyManagerTests {
         let watch = WatchOnlyKeyManager(paymentVerificationKey: pVKey)
 
         do {
-            _ = try await watch.paymentSigningKeyType(at: .payment())
+            _ = try watch.paymentSigningKeyType(at: .payment())
             Issue.record("Expected watchOnly error")
         } catch let error as WalletError {
             #expect(error == .watchOnly)

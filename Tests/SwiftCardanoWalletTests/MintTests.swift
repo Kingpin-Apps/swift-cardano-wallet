@@ -65,12 +65,12 @@ struct MintTests {
         #expect(body.mint != nil)
         let mintAsset = body.mint?.data[policyId]
         #expect(mintAsset != nil)
-        #expect(mintAsset?[try AssetName(from: "MyToken")] == 5)
+        #expect(mintAsset?[AssetName(from: "MyToken")] == 5)
 
         // An output for the recipient with the same asset.
         let mintOutput = body.outputs.first { $0.address == receive && !$0.amount.multiAsset.data.isEmpty }
         #expect(mintOutput != nil)
-        #expect(mintOutput?.amount.multiAsset.data[policyId]?[try AssetName(from: "MyToken")] == 5)
+        #expect(mintOutput?.amount.multiAsset.data[policyId]?[AssetName(from: "MyToken")] == 5)
     }
 
     @Test func mintIncludesPolicyAsNativeScriptInWitnessSet() async throws {
@@ -127,7 +127,7 @@ struct MintTests {
         let receive = try await probe.receiveAddress()
         let policy = try await walletOneShotPolicy(for: probe)
         let policyId = try policy.scriptHash()
-        let assetName = try AssetName(from: "BurnMe")
+        let assetName = AssetName(from: "BurnMe")
 
         // Seed two UTxOs: one with 50 ADA for fees, one carrying 10 of the asset.
         let feeUTxO = try TestFixtures.makeUTxO(at: receive, lovelace: 50_000_000, index: 0)
@@ -181,7 +181,7 @@ struct MintTests {
         let body = prepared.transaction.transactionBody
         let mintData = body.mint?.data ?? [:]
         #expect(mintData.count == 1)
-        let expectedAssetName = try AssetName(from: "CoolestNFT")
+        let expectedAssetName = AssetName(from: "CoolestNFT")
         var sawNFT = false
         for (_, asset) in mintData {
             for (an, qty) in asset.data where an == expectedAssetName {
@@ -215,20 +215,20 @@ struct MintTests {
         let policyId = try policy.scriptHash()
         let fp = try wallet.assetFingerprint(
             policyId: policyId,
-            assetName: try AssetName(from: "Tok")
+            assetName: AssetName(from: "Tok")
         )
         #expect(fp.hasPrefix("asset1"))
         // Same inputs → same fingerprint.
         let fp2 = try wallet.assetFingerprint(
             policyId: policyId,
-            assetName: try AssetName(from: "Tok")
+            assetName: AssetName(from: "Tok")
         )
         #expect(fp == fp2)
     }
 
     @Test func cip25EncodingShape() throws {
         let policyHex = String(repeating: "ab", count: 28)
-        let policyId = try ScriptHash(payload: Data(hex: policyHex))
+        let policyId = ScriptHash(payload: Data(hex: policyHex))
         let metadata = CIP25NFTMetadata(name: "MyNFT", image: "ipfs://x", description: "y")
         let encoded = metadata.encode(policyId: policyId, assetName: "MyNFT")
         guard case .map(let top) = encoded else {
