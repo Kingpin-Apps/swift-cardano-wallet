@@ -1,3 +1,9 @@
+## 1.0.0 (2026-05-29)
+
+### Feat
+
+- widen money types and balance fields to Int64 for core 0.4.x
+
 ## 0.1.2 (2026-05-16)
 
 ### Fix
