@@ -1,3 +1,9 @@
+## 1.1.0 (2026-05-29)
+
+### Feat
+
+- **wallet**: add generate() factories + reorg tests
+
 ## 1.0.0 (2026-05-29)
 
 ### Feat
