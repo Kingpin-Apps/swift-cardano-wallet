@@ -210,4 +210,183 @@ struct WalletEnumTests {
         #expect(wallet.kind == .mnemonic)
         #expect(wallet.network == .preprod)
     }
+
+    // MARK: - Generation factories
+
+    @Test func generateMnemonicReturnsMnemonicCaseAndPhrase() async throws {
+        let stub = StubChainContext(networkId: .testnet)
+        let (wallet, phrase) = try await Wallet.generateMnemonic(
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        #expect(wallet.kind == .mnemonic)
+        #expect(wallet.network == .preprod)
+        #expect(phrase.split(separator: " ").count == 24)
+
+        let addr = try await wallet.primaryAddress()
+        #expect(try addr.toBech32().hasPrefix("addr_test1"))
+    }
+
+    @Test func generateEncryptedReturnsBlobThatRedecrypts() async throws {
+        let stub = StubChainContext(networkId: .testnet)
+        let (wallet, phrase, blob) = try await Wallet.generateEncrypted(
+            passphrase: "user-pass",
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        #expect(wallet.kind == .mnemonic)
+        #expect(phrase.split(separator: " ").count == 24)
+
+        // The blob is the at-rest form. Decrypt it back and confirm the resulting wallet
+        // has the same primary address.
+        let reopened = try await Wallet.encrypted(
+            blob: blob,
+            passphrase: "user-pass",
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        let original = try await wallet.primaryAddress()
+        let restored = try await reopened.primaryAddress()
+        #expect(original == restored)
+    }
+
+    @Test func generateTextEnvelopeWritesFilesAndReturnsEnumCase() async throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("wallet-te-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let stub = StubChainContext(networkId: .testnet)
+        let (wallet, paymentURL, stakeURL) = try await Wallet.generateTextEnvelope(
+            writeTo: dir,
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        #expect(wallet.kind == .textEnvelope)
+        #expect(FileManager.default.fileExists(atPath: paymentURL.path))
+        #expect(FileManager.default.fileExists(atPath: stakeURL.path))
+    }
+
+    @Test func generatedMnemonicWalletCanSign() async throws {
+        // canSign is false only for watchOnly; the freshly-generated mnemonic must be true.
+        let stub = StubChainContext(networkId: .testnet)
+        let (wallet, _) = try await Wallet.generateMnemonic(
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        #expect(wallet.canSign == true)
+    }
+}
+
+@Suite("Wallet enum — extended cases (textEnvelope, watchOnly, encrypted factory)")
+struct WalletEnumExtendedTests {
+
+    @Test func watchOnlyFactoryWrapsCorrectly() async throws {
+        let km = try MnemonicKeyManager(mnemonic: testMnemonic, passphrase: "")
+        let account = Account(network: .preprod)
+        let pVKey = try await km.paymentVerificationKey(at: account.paymentPath())
+        let sVKey = try await km.stakeVerificationKey(at: account.stakePath())
+        let stub = StubChainContext(networkId: .testnet)
+        let wallet = try await Wallet.watchOnly(
+            paymentVerificationKey: pVKey,
+            stakeVerificationKey: sVKey,
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        #expect(wallet.kind == .watchOnly)
+        #expect(wallet.canSign == false)
+        #expect(wallet.watchOnlyWallet != nil)
+    }
+
+    @Test func watchOnlySendThrowsThroughEnum() async throws {
+        let km = try MnemonicKeyManager(mnemonic: testMnemonic, passphrase: "")
+        let account = Account(network: .preprod)
+        let pVKey = try await km.paymentVerificationKey(at: account.paymentPath())
+        let stub = StubChainContext(networkId: .testnet)
+        let wallet = try await Wallet.watchOnly(
+            paymentVerificationKey: pVKey,
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        let dest = try await Account(index: 7, network: .preprod).address(with: km)
+        do {
+            _ = try await wallet.send(lovelace: 1_000_000, to: dest)
+            Issue.record("Expected watchOnly error")
+        } catch let error as WalletError {
+            if case .watchOnly = error { /* expected */ } else {
+                Issue.record("Unexpected: \(error)")
+            }
+        }
+    }
+
+    @Test func encryptedFactoryDecryptsBlobAndProducesMnemonicWallet() async throws {
+        let mnemonic = testMnemonic
+        let passphrase = "correct horse battery staple"
+        let encryptedKM = try await EncryptedKeyManager(mnemonic: mnemonic, passphrase: passphrase)
+        let blob = try await encryptedKM.encryptedBlob(passphrase: passphrase)
+
+        let stub = StubChainContext(networkId: .testnet)
+        let wallet = try await Wallet.encrypted(
+            blob: blob,
+            passphrase: passphrase,
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        // encrypted is just a key-management concern → produces a .mnemonic case.
+        #expect(wallet.kind == .mnemonic)
+        #expect(wallet.canSign == true)
+        #expect(wallet.mnemonicWallet != nil)
+        // Should derive the same receive address as the original mnemonic.
+        let expectedAddr = try await Account(network: .preprod).address(
+            with: try MnemonicKeyManager(mnemonic: mnemonic, passphrase: "")
+        )
+        #expect(try await wallet.primaryAddress() == expectedAddr)
+    }
+
+    @Test func encryptedFactoryRejectsWrongPassphrase() async throws {
+        let encryptedKM = try await EncryptedKeyManager(
+            mnemonic: testMnemonic,
+            passphrase: "right"
+        )
+        let blob = try await encryptedKM.encryptedBlob(passphrase: "right")
+        let stub = StubChainContext(networkId: .testnet)
+        do {
+            _ = try await Wallet.encrypted(
+                blob: blob,
+                passphrase: "wrong",
+                network: .preprod,
+                provider: .custom(make: { stub })
+            )
+            Issue.record("Expected invalidPassphrase")
+        } catch let error as WalletError {
+            if case .invalidPassphrase = error { /* expected */ } else {
+                Issue.record("Unexpected: \(error)")
+            }
+        }
+    }
+
+    @Test func textEnvelopeFactoryEndToEnd() async throws {
+        let km = try MnemonicKeyManager(mnemonic: testMnemonic, passphrase: "")
+        let account = Account(network: .preprod)
+        let pExt = try await km.paymentSigningKey(at: account.paymentPath())
+        let sExt = try await km.stakeSigningKey(at: account.stakePath())
+
+        let dir = NSTemporaryDirectory().appending("envelope-enum-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let pSkey = URL(fileURLWithPath: (dir as NSString).appendingPathComponent("payment.skey"))
+        let sSkey = URL(fileURLWithPath: (dir as NSString).appendingPathComponent("stake.skey"))
+        try pExt.save(to: pSkey.path, overwrite: true)
+        try sExt.save(to: sSkey.path, overwrite: true)
+
+        let stub = StubChainContext(networkId: .testnet)
+        let wallet = try await Wallet.textEnvelope(
+            paymentKeyFile: pSkey,
+            stakeKeyFile: sSkey,
+            network: .preprod,
+            provider: .custom(make: { stub })
+        )
+        #expect(wallet.kind == .textEnvelope)
+        #expect(wallet.canSign == true)
+        #expect(wallet.textEnvelopeWallet != nil)
+    }
 }

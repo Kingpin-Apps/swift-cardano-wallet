@@ -71,6 +71,51 @@ To enable the optional SQLite-backed UTxO cache:
 ),
 ```
 
+## Generating a new wallet
+
+Every constructor on this page takes existing key material. To mint a fresh wallet,
+use the matching `generate(...)` factory:
+
+```swift
+// HD mnemonic — the default. Returns the freshly-minted phrase; persist or display
+// it to the user before this tuple goes out of scope — once it's gone, the keys are
+// unrecoverable.
+let (wallet, phrase) = try await Wallet.generateMnemonic(
+    network: .mainnet,
+    provider: .blockfrost(projectId: "mainnet_…")
+)
+
+// Generate + encrypt in one round-trip. The blob is the at-rest form; persist it via
+// any KeyStore.
+let (wallet, phrase, blob) = try await Wallet.generateEncrypted(
+    passphrase: userPassphrase,
+    network: .mainnet,
+    provider: .blockfrost(projectId: "mainnet_…")
+)
+try await keyStore.save(blob, id: "primary")
+
+// TextEnvelope (`cardano-cli`-style `.skey` files on disk).
+let (wallet, paymentSkeyURL, stakeSkeyURL) = try await Wallet.generateTextEnvelope(
+    writeTo: keyDirectory,
+    network: .preprod,
+    provider: .blockfrost(projectId: "preprod_…")
+)
+```
+
+`watchOnly`, `multisig`, and `hardware` wallets do not get `generate` factories by
+design — they wrap pre-existing key material (vkeys, key hashes, device-generated
+`.hwsfile`s) and there is no fresh-keypair operation to perform locally.
+
+`MnemonicWallet.generate` accepts a `wordCount:` of 12 / 15 / 18 / 21 / 24 (default 24)
+and a `language:` parameter (default `.english`). All BIP-39 wordlists exposed by
+`swift-cardano-core` round-trip — English, Japanese, Spanish, French, Italian, Korean,
+Czech, Portuguese, and the two Chinese variants. Japanese phrases are joined with
+`U+3000 IDEOGRAPHIC SPACE` per BIP-39 and recover via NFKD normalization on the
+upstream side.
+`TextEnvelopeWallet` also exposes a `generateInMemory(...)` variant that hands back the
+raw 32-byte signing key payloads instead of writing them to disk, for callers that
+want to persist via a custom `KeyStore`.
+
 ## Five lines to send ADA
 
 ```swift

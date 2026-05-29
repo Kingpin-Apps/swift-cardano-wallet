@@ -48,6 +48,23 @@ BIP-39 phrase + BIP-32 HD derivation per [CIP-1852](https://cips.cardano.org/cip
 The default — backed by ``MnemonicKeyManager``. Address derivation walks the `external`
 and `change` roles up to `gapLimit` (default 20).
 
+To mint a **fresh** mnemonic wallet from scratch:
+
+```swift
+let (wallet, phrase) = try await Wallet.generateMnemonic(
+    wordCount: 24,                  // 12 / 15 / 18 / 21 / 24 (default 24)
+    language: .english,             // any BIP-39 wordlist swift-cardano-core supports
+    network: .mainnet,
+    provider: .blockfrost(projectId: "mainnet_…")
+)
+// Display or persist `phrase` before the tuple goes out of scope — once it's gone,
+// the keys are unrecoverable.
+```
+
+> Japanese phrases use `U+3000 IDEOGRAPHIC SPACE` as the canonical word separator per
+> BIP-39 — generation emits that form, and the upstream recovery path normalizes via
+> NFKD so either separator round-trips.
+
 ## Encrypted (passphrase-encrypted blob)
 
 ```swift
@@ -89,6 +106,18 @@ with ``KeychainKeyStore`` (Apple) or ``FileKeyStore`` (cross-platform JSON-on-di
   blob to `0o600` regardless of process umask. Existing directories supplied to
   ``FileKeyStore/init(directory:createIfMissing:)`` are left untouched.
 
+For a one-shot **generate-and-encrypt** flow:
+
+```swift
+let (wallet, phrase, blob) = try await Wallet.generateEncrypted(
+    passphrase: userPassphrase,
+    network: .mainnet,
+    provider: .blockfrost(projectId: "mainnet_…")
+)
+try await store.save(blob, id: "primary")
+// Show `phrase` once for offline backup, then drop it from memory.
+```
+
 ## TextEnvelope (`cardano-cli` `.skey` files)
 
 ```swift
@@ -104,6 +133,22 @@ For workflows where keys live in `cardano-cli`-format files. Backed by
 ``TextEnvelopeWallet`` + ``TextEnvelopeKeyManager``. Single-address (CLI keys are flat,
 not HD); full send + sign capability. Useful for migrating existing CLI-managed wallets
 or for offline setups where keys are generated outside the app.
+
+To mint fresh `.skey` files (matches the `cardano-cli address key-gen` filename
+convention):
+
+```swift
+let (wallet, paymentSkeyURL, stakeSkeyURL) = try await Wallet.generateTextEnvelope(
+    writeTo: keyDirectory,
+    network: .preprod,
+    provider: .blockfrost(projectId: "preprod_…")
+)
+```
+
+If you'd rather keep the keys out of the filesystem entirely, use
+``TextEnvelopeWallet/generateInMemory(network:provider:accountIndex:)`` — it returns the
+wallet plus the raw 32-byte signing-key payloads for the caller to persist via a custom
+``KeyStore``.
 
 ## Watch-only
 

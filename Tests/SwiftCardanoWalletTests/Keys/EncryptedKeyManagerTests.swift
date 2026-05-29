@@ -205,4 +205,53 @@ struct EncryptedKeyManagerTests {
         let acct = Account(network: .mainnet)
         #expect(try await acct.address(with: restored) == (try await acct.address(with: fresh)))
     }
+
+    // MARK: - Generation
+
+    @Test func generateProducesEncryptableManagerAndFreshPhrase() async throws {
+        let (km, phrase) = try await EncryptedKeyManager.generate(
+            passphrase: "pp",
+            wordCount: 24
+        )
+        #expect(phrase.split(separator: " ").count == 24)
+
+        // The returned manager must round-trip its own blob with the same passphrase.
+        let blob = try await km.encryptedBlob(passphrase: "pp")
+        let restored = try await EncryptedKeyManager(blob: blob, passphrase: "pp")
+        #expect(await restored.mnemonic == phrase)
+    }
+
+    @Test func generateDefaultsTo24Words() async throws {
+        let (_, phrase) = try await EncryptedKeyManager.generate(passphrase: "pp")
+        #expect(phrase.split(separator: " ").count == 24)
+    }
+
+    @Test func generateRejectsEmptyPassphrase() async throws {
+        do {
+            _ = try await EncryptedKeyManager.generate(passphrase: "")
+            Issue.record("Expected invalidPassphrase")
+        } catch let error as WalletError {
+            #expect(error == .invalidPassphrase)
+        }
+    }
+
+    @Test func generateRejectsInvalidWordCount() async throws {
+        do {
+            _ = try await EncryptedKeyManager.generate(passphrase: "pp", wordCount: 13)
+            Issue.record("Expected configurationMissing")
+        } catch let error as WalletError {
+            if case .configurationMissing = error { /* expected */ } else {
+                Issue.record("Unexpected: \(error)")
+            }
+        }
+    }
+
+    @Test func generateAcceptsBip39Passphrase() async throws {
+        let (km, _) = try await EncryptedKeyManager.generate(
+            passphrase: "pp",
+            wordCount: 12,
+            bip39Passphrase: "TREZOR"
+        )
+        #expect(await km.bip39Passphrase == "TREZOR")
+    }
 }

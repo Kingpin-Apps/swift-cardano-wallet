@@ -2,6 +2,7 @@ import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
 import SwiftCardanoUtils
+import SwiftMnemonic
 
 /// Top-level handle for any wallet type shipped by `SwiftCardanoWallet`. Unifies
 /// ``MnemonicWallet``, ``MultisigWallet``, and ``HardwareWallet`` behind one `Sendable`
@@ -406,6 +407,114 @@ public enum Wallet: Sendable {
             hwcli: hwcli
         )
         return .hardware(w)
+    }
+
+    // MARK: - Generation
+
+    /// Generate a fresh BIP-39 phrase and return a ``Wallet/mnemonic(_:)`` along with the
+    /// freshly-minted phrase. **Display or persist the phrase before this tuple goes out
+    /// of scope** — once it's gone, the keys are unrecoverable.
+    ///
+    /// ```swift
+    /// let (wallet, phrase) = try await Wallet.generateMnemonic(
+    ///     network: .mainnet,
+    ///     provider: .blockfrost(projectId: "mainnet_…")
+    /// )
+    /// backupSheet.show(phrase: phrase)
+    /// ```
+    ///
+    /// - Parameters: see ``MnemonicWallet/generate(wordCount:language:network:provider:passphrase:accountIndex:utxoStore:gapLimit:handleResolver:)``.
+    public static func generateMnemonic(
+        wordCount: Int = 24,
+        language: Language = .english,
+        network: Network,
+        provider: ProviderConfig,
+        passphrase: String = "",
+        accountIndex: UInt32 = 0,
+        utxoStore: UTxOStore? = nil,
+        gapLimit: UInt32 = 20,
+        handleResolver: (any HandleResolver)? = nil
+    ) async throws -> (wallet: Wallet, phrase: String) {
+        let generated = try await MnemonicWallet.generate(
+            wordCount: wordCount,
+            language: language,
+            network: network,
+            provider: provider,
+            passphrase: passphrase,
+            accountIndex: accountIndex,
+            utxoStore: utxoStore,
+            gapLimit: gapLimit,
+            handleResolver: handleResolver
+        )
+        return (.mnemonic(generated.wallet), generated.phrase)
+    }
+
+    /// Generate a fresh BIP-39 phrase, encrypt it with `passphrase`, persist the result
+    /// in a single round trip, and return a ``Wallet/mnemonic(_:)`` along with the
+    /// encrypted blob (ready for ``KeyStore/save(_:id:)``) and the underlying phrase.
+    /// The blob is the at-rest form; the phrase is the offline backup.
+    ///
+    /// ```swift
+    /// let (wallet, phrase, blob) = try await Wallet.generateEncrypted(
+    ///     passphrase: userPassphrase,
+    ///     network: .mainnet,
+    ///     provider: .blockfrost(projectId: "mainnet_…")
+    /// )
+    /// backupSheet.show(phrase: phrase)
+    /// try await keyStore.save(blob, id: "primary")
+    /// ```
+    public static func generateEncrypted(
+        passphrase: String,
+        wordCount: Int = 24,
+        language: Language = .english,
+        network: Network,
+        provider: ProviderConfig,
+        bip39Passphrase: String = "",
+        iterations: Int = EncryptedKeyManager.defaultIterations,
+        accountIndex: UInt32 = 0,
+        utxoStore: UTxOStore? = nil,
+        gapLimit: UInt32 = 20,
+        handleResolver: (any HandleResolver)? = nil
+    ) async throws -> (wallet: Wallet, phrase: String, blob: EncryptedBlob) {
+        let (km, phrase) = try await EncryptedKeyManager.generate(
+            passphrase: passphrase,
+            wordCount: wordCount,
+            language: language,
+            bip39Passphrase: bip39Passphrase,
+            iterations: iterations
+        )
+        let blob = try await km.encryptedBlob(passphrase: passphrase)
+        let wallet = try await Self.mnemonic(
+            phrase: phrase,
+            network: network,
+            provider: provider,
+            passphrase: bip39Passphrase,
+            accountIndex: accountIndex,
+            utxoStore: utxoStore,
+            gapLimit: gapLimit,
+            handleResolver: handleResolver
+        )
+        return (wallet, phrase, blob)
+    }
+
+    /// Generate fresh `.skey` files on disk, then wrap them in a
+    /// ``Wallet/textEnvelope(_:)``. The returned URLs are the user's backup — they must
+    /// not lose them.
+    public static func generateTextEnvelope(
+        writeTo directory: URL,
+        network: Network,
+        provider: ProviderConfig,
+        accountIndex: UInt32 = 0,
+        overwrite: Bool = false
+    ) async throws -> (wallet: Wallet, paymentSkeyURL: URL, stakeSkeyURL: URL) {
+        let generated = try await TextEnvelopeWallet.generate(
+            writeTo: directory,
+            network: network,
+            provider: provider,
+            accountIndex: accountIndex,
+            overwrite: overwrite
+        )
+        return (.textEnvelope(generated.wallet), generated.paymentSkeyURL, generated.stakeSkeyURL)
     }
 }
 
