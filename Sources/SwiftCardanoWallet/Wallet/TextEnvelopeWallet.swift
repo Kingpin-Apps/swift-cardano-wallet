@@ -204,4 +204,142 @@ public actor TextEnvelopeWallet: WalletProtocol {
         let signed = try await prepared.sign()
         return try await signed.submit()
     }
+
+    // MARK: - Generation
+
+    /// Generate a fresh non-extended Ed25519 payment + stake key pair, write them as
+    /// `payment.skey` / `stake.skey` TextEnvelope files inside `directory`, and build a
+    /// ``TextEnvelopeWallet`` around the new files. Matches the file layout produced by
+    /// `cardano-cli address key-gen` so the resulting `.skey`s drop into any existing
+    /// `cardano-cli`-based toolchain.
+    ///
+    /// ```swift
+    /// let generated = try await TextEnvelopeWallet.generate(
+    ///     writeTo: keyDirectory,
+    ///     network: .preprod,
+    ///     provider: .blockfrost(projectId: "preprod_…")
+    /// )
+    /// print("Backed up to:", generated.paymentSkeyURL.path, generated.stakeSkeyURL.path)
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - directory: where to write the `.skey` files. Created if it doesn't exist.
+    ///   - network: target Cardano network.
+    ///   - provider: chain backend.
+    ///   - accountIndex: stored on the wallet's ``Account`` for parity with HD wallets;
+    ///     CLI keys are flat so the index does not influence the derived address.
+    ///   - overwrite: if `false` (default) and either file already exists in
+    ///     `directory`, throws ``WalletError/keystore(_:)``.
+    public static func generate(
+        writeTo directory: URL,
+        network: Network,
+        provider: ProviderConfig,
+        accountIndex: UInt32 = 0,
+        overwrite: Bool = false
+    ) async throws -> GeneratedTextEnvelopeWallet {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: directory.path) {
+            try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        let paymentURL = directory.appendingPathComponent("payment.skey")
+        let stakeURL = directory.appendingPathComponent("stake.skey")
+        if !overwrite {
+            if fm.fileExists(atPath: paymentURL.path) {
+                throw WalletError.keystore("Refusing to overwrite existing payment.skey at \(paymentURL.path)")
+            }
+            if fm.fileExists(atPath: stakeURL.path) {
+                throw WalletError.keystore("Refusing to overwrite existing stake.skey at \(stakeURL.path)")
+            }
+        }
+
+        let paymentKeyPair: PaymentKeyPair
+        let stakeKeyPair: StakeKeyPair
+        do {
+            paymentKeyPair = try PaymentKeyPair.generate()
+            stakeKeyPair = try StakeKeyPair.generate()
+        } catch {
+            throw WalletError.derivationFailed("TextEnvelope key generation failed: \(error)")
+        }
+
+        do {
+            try paymentKeyPair.signingKey.save(to: paymentURL.path, overwrite: overwrite)
+            try stakeKeyPair.signingKey.save(to: stakeURL.path, overwrite: overwrite)
+        } catch {
+            throw WalletError.keystore("Failed to write generated .skey file: \(error)")
+        }
+
+        let wallet = try await TextEnvelopeWallet(
+            paymentKeyFile: paymentURL,
+            stakeKeyFile: stakeURL,
+            network: network,
+            provider: provider,
+            accountIndex: accountIndex
+        )
+        return GeneratedTextEnvelopeWallet(
+            wallet: wallet,
+            paymentSkeyURL: paymentURL,
+            stakeSkeyURL: stakeURL
+        )
+    }
+
+    /// Generate fresh keys and build the wallet without persisting anything to disk.
+    /// The raw 32-byte signing key payloads are returned alongside the wallet so the
+    /// caller can persist them via their own ``KeyStore`` or pipe them through encryption.
+    ///
+    /// Use this when you want full control over how the keys are stored — e.g.
+    /// hand them to a custom ``KeyStore`` that stores them in the iOS keychain rather
+    /// than on the filesystem.
+    public static func generateInMemory(
+        network: Network,
+        provider: ProviderConfig,
+        accountIndex: UInt32 = 0
+    ) async throws -> GeneratedInMemoryTextEnvelopeWallet {
+        let paymentKeyPair: PaymentKeyPair
+        let stakeKeyPair: StakeKeyPair
+        do {
+            paymentKeyPair = try PaymentKeyPair.generate()
+            stakeKeyPair = try StakeKeyPair.generate()
+        } catch {
+            throw WalletError.derivationFailed("TextEnvelope key generation failed: \(error)")
+        }
+
+        let paymentPayload = paymentKeyPair.signingKey.payload
+        let stakePayload = stakeKeyPair.signingKey.payload
+
+        let km = TextEnvelopeKeyManager(
+            paymentPayload: paymentPayload,
+            paymentIsExtended: false,
+            stakePayload: stakePayload,
+            stakeIsExtended: false
+        )
+        let wallet = try await TextEnvelopeWallet(
+            keyManager: km,
+            network: network,
+            provider: provider,
+            accountIndex: accountIndex
+        )
+        return GeneratedInMemoryTextEnvelopeWallet(
+            wallet: wallet,
+            paymentSigningKeyPayload: paymentPayload,
+            stakeSigningKeyPayload: stakePayload
+        )
+    }
+}
+
+/// Returned by ``TextEnvelopeWallet/generate(writeTo:network:provider:accountIndex:overwrite:)``.
+/// Carries the on-disk paths of the freshly-written `.skey` files alongside the wallet.
+public struct GeneratedTextEnvelopeWallet: Sendable {
+    public let wallet: TextEnvelopeWallet
+    public let paymentSkeyURL: URL
+    public let stakeSkeyURL: URL
+}
+
+/// Returned by ``TextEnvelopeWallet/generateInMemory(network:provider:accountIndex:)``.
+/// Carries the raw 32-byte Ed25519 signing-key payloads — persist them via your own
+/// ``KeyStore`` before this value goes out of scope.
+public struct GeneratedInMemoryTextEnvelopeWallet: Sendable {
+    public let wallet: TextEnvelopeWallet
+    public let paymentSigningKeyPayload: Data
+    public let stakeSigningKeyPayload: Data
 }

@@ -119,4 +119,101 @@ struct MnemonicWalletTests {
         #expect(wallet.network == .mainnet)
         #expect(wallet.account.index == 0)
     }
+
+    // MARK: - Generation
+
+    @Test func generateProducesUsableWalletWithCorrectWordCount() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let generated = try await MnemonicWallet.generate(
+            wordCount: 24,
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        let words = generated.phrase.split(separator: " ")
+        #expect(words.count == 24)
+        let addr = try await generated.wallet.receiveAddress()
+        #expect(try addr.toBech32().hasPrefix("addr1"))
+    }
+
+    @Test func generateDefaultsTo24Words() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let generated = try await MnemonicWallet.generate(
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        #expect(generated.phrase.split(separator: " ").count == 24)
+    }
+
+    @Test func generateSupports12WordPhrases() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let generated = try await MnemonicWallet.generate(
+            wordCount: 12,
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        #expect(generated.phrase.split(separator: " ").count == 12)
+    }
+
+    @Test func generateRejectsInvalidWordCount() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        for bad in [0, 11, 13, 20, 25, 30] {
+            do {
+                _ = try await MnemonicWallet.generate(
+                    wordCount: bad,
+                    network: .mainnet,
+                    provider: .custom(make: { stub })
+                )
+                Issue.record("Expected configurationMissing for wordCount=\(bad)")
+            } catch let error as WalletError {
+                if case .configurationMissing = error { /* expected */ } else {
+                    Issue.record("Unexpected: \(error)")
+                }
+            }
+        }
+    }
+
+    @Test func generatedWalletsAreNonDeterministic() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let a = try await MnemonicWallet.generate(
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        let b = try await MnemonicWallet.generate(
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        #expect(a.phrase != b.phrase)
+        let addrA = try await a.wallet.receiveAddress()
+        let addrB = try await b.wallet.receiveAddress()
+        #expect(addrA != addrB)
+    }
+
+    @Test func generatedPhraseRoundTripsThroughMnemonicKeyManager() async throws {
+        // Generated phrase + the same passphrase must build a deterministic KM that
+        // matches the wallet's derived key. Confirms the phrase the caller sees is the
+        // actual recovery material, not a divergent representation.
+        let stub = StubChainContext(networkId: .mainnet)
+        let generated = try await MnemonicWallet.generate(
+            network: .mainnet,
+            provider: .custom(make: { stub }),
+            passphrase: "extra"
+        )
+        let km = try MnemonicKeyManager(mnemonic: generated.phrase, passphrase: "extra")
+        let acct = Account(network: .mainnet)
+        let expected = try await acct.address(with: km)
+        let actual = try await generated.wallet.receiveAddress()
+        #expect(expected == actual)
+    }
+
+    @Test func generatedEntropyDecodesToCorrectLength() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        for (words, expectedBytes) in [(12, 16), (15, 20), (18, 24), (21, 28), (24, 32)] {
+            let generated = try await MnemonicWallet.generate(
+                wordCount: words,
+                network: .mainnet,
+                provider: .custom(make: { stub })
+            )
+            #expect(generated.entropy.count == expectedBytes)
+        }
+    }
 }

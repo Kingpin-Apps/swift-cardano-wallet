@@ -30,6 +30,11 @@ let package = Package(
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.3.2"),
         .package(url: "https://github.com/Kingpin-Apps/swift-handles-api.git", from: "0.1.1"),
         .package(url: "https://github.com/Kingpin-Apps/swift-gnupg.git", from: "0.1.3"),
+        // SwiftMnemonic is also a transitive dep via swift-cardano-core; we depend on it
+        // directly so wallet-generation entry points (MnemonicWallet.generate, etc.) can
+        // reference WordCount / Language explicitly without relying on transitive
+        // visibility.
+        .package(url: "https://github.com/Kingpin-Apps/swift-mnemonic.git", from: "0.2.5"),
         // SQLite backend for SQLiteUTxOStore. Only linked when the `SQLite` package trait is enabled.
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.15.3"),
     ],
@@ -45,6 +50,7 @@ let package = Package(
                 .product(name: "SwiftCardanoCIPs", package: "swift-cardano-cips"),
                 .product(name: "SwiftHandlesAPI", package: "swift-handles-api"),
                 .product(name: "GnuPG", package: "swift-gnupg"),
+                .product(name: "SwiftMnemonic", package: "swift-mnemonic"),
                 .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
                 .product(name: "SQLite", package: "SQLite.swift", condition: .when(traits: ["SQLite"])),
             ],

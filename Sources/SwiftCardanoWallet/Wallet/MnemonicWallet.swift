@@ -1,6 +1,7 @@
 import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
+import SwiftMnemonic
 
 /// HD wallet rooted in a BIP-39 mnemonic, querying / submitting through a chain provider.
 ///
@@ -113,5 +114,101 @@ public actor MnemonicWallet: WalletProtocol {
     /// constructed without one.
     public nonisolated var handleResolver: (any HandleResolver)? {
         _handleResolver
+    }
+
+    // MARK: - Generation
+
+    /// Generate a fresh BIP-39 phrase and build a ``MnemonicWallet`` around it.
+    ///
+    /// The returned ``GeneratedMnemonicWallet`` value carries the **fresh phrase** alongside
+    /// the wallet — you must persist (or display to the user for backup) the phrase before
+    /// the value goes out of scope. Once it's gone, the phrase is unrecoverable.
+    ///
+    /// ```swift
+    /// let generated = try await MnemonicWallet.generate(
+    ///     network: .mainnet,
+    ///     provider: .blockfrost(projectId: "mainnet_…")
+    /// )
+    /// userDefaults.showBackupSheet(phrase: generated.phrase)   // hand to user, then forget
+    /// let wallet = generated.wallet
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - wordCount: 12, 15, 18, 21, or 24. Defaults to 24 (256 bits of entropy — the
+    ///     BIP-39 maximum). Anything else throws ``WalletError/configurationMissing(_:)``.
+    ///   - network: target Cardano network.
+    ///   - provider: chain backend.
+    ///   - passphrase: optional BIP-39 passphrase ("25th word"). Empty by default.
+    ///   - accountIndex: CIP-1852 account index. Default 0.
+    ///   - utxoStore: see ``init(mnemonic:network:provider:passphrase:accountIndex:utxoStore:gapLimit:handleResolver:)``.
+    ///   - gapLimit: see init.
+    ///   - handleResolver: see init.
+    public static func generate(
+        wordCount: Int = 24,
+        network: Network,
+        provider: ProviderConfig,
+        passphrase: String = "",
+        accountIndex: UInt32 = 0,
+        utxoStore: UTxOStore? = nil,
+        gapLimit: UInt32 = 20,
+        handleResolver: (any HandleResolver)? = nil
+    ) async throws -> GeneratedMnemonicWallet {
+        guard let wc = WordCount(rawValue: wordCount) else {
+            throw WalletError.configurationMissing(
+                "wordCount must be 12, 15, 18, 21, or 24; got \(wordCount)."
+            )
+        }
+        let words: [String]
+        do {
+            words = try HDWallet.generateMnemonic(language: .english, wordCount: wc)
+        } catch {
+            throw WalletError.derivationFailed("mnemonic generation failed: \(error)")
+        }
+        let phrase = words.joined(separator: " ")
+
+        let wallet = try await MnemonicWallet(
+            mnemonic: phrase,
+            network: network,
+            provider: provider,
+            passphrase: passphrase,
+            accountIndex: accountIndex,
+            utxoStore: utxoStore,
+            gapLimit: gapLimit,
+            handleResolver: handleResolver
+        )
+        return GeneratedMnemonicWallet(wallet: wallet, phrase: phrase)
+    }
+}
+
+/// Carries a freshly-generated mnemonic alongside the wallet it built. **The phrase is
+/// the only path to recovering this wallet** — display it to the user (so they can write
+/// it down) or persist it via an ``EncryptedKeyManager`` / ``KeyStore`` before this value
+/// goes out of scope.
+///
+/// `entropy` is the raw seed material the phrase encodes (16 / 20 / 24 / 28 / 32 bytes for
+/// 12 / 15 / 18 / 21 / 24 word counts). Equivalent to the phrase as far as wallet
+/// recovery is concerned; offered for callers that prefer to store the binary form.
+public struct GeneratedMnemonicWallet: Sendable {
+    public let wallet: MnemonicWallet
+    public let phrase: String
+
+    /// Raw entropy backing ``phrase``. Lazily decoded from the phrase on demand.
+    public var entropy: Data {
+        // BIP-39 phrase → entropy is deterministic and cheap; decode on read so
+        // callers that only care about `phrase` don't pay anything.
+        do {
+            let words = phrase.split(separator: " ").map(String.init)
+            return try Mnemonic.toEntropy(words, wordlist: Language.english.words())
+        } catch {
+            // Phrase came from HDWallet.generateMnemonic; if decoding fails here the
+            // upstream invariant is broken — surface a recognizable empty value rather
+            // than crashing.
+            return Data()
+        }
+    }
+
+    public init(wallet: MnemonicWallet, phrase: String) {
+        self.wallet = wallet
+        self.phrase = phrase
     }
 }

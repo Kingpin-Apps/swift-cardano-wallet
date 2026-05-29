@@ -3,6 +3,7 @@ import CryptoKit
 import Security
 import OrderedCollections
 import SwiftCardanoCore
+import SwiftMnemonic
 
 /// Minimum PBKDF2 iteration count we will accept on decrypt. Roughly half the
 /// recommended default — gives us headroom to lower the default in a future release
@@ -287,5 +288,53 @@ public actor EncryptedKeyManager: KeyManager {
         }
         let bip39 = parts.count > 1 ? parts.dropFirst().joined(separator: "\n") : ""
         return (phrase, bip39)
+    }
+
+    // MARK: - Generation
+
+    /// Generate a fresh BIP-39 phrase, wrap it in an encrypted key manager, and return
+    /// both. The caller typically immediately calls ``encryptedBlob(passphrase:)`` on
+    /// the returned manager to persist via a ``KeyStore``.
+    ///
+    /// ```swift
+    /// let generated = try await EncryptedKeyManager.generate(
+    ///     passphrase: "correct horse battery staple"
+    /// )
+    /// userBackupSheet.show(phrase: generated.phrase)
+    /// let blob = try await generated.manager.encryptedBlob(passphrase: "correct horse battery staple")
+    /// try await keyStore.save(blob, id: "primary")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - passphrase: protects the encrypted blob at rest. Must be non-empty.
+    ///   - wordCount: 12 / 15 / 18 / 21 / 24. Defaults to 24.
+    ///   - bip39Passphrase: optional BIP-39 25th-word passphrase. Empty by default.
+    ///   - iterations: PBKDF2-SHA512 iteration count. Defaults to
+    ///     ``defaultIterations``; must be at least 100,000.
+    public static func generate(
+        passphrase: String,
+        wordCount: Int = 24,
+        bip39Passphrase: String = "",
+        iterations: Int = EncryptedKeyManager.defaultIterations
+    ) async throws -> (manager: EncryptedKeyManager, phrase: String) {
+        guard let wc = SwiftMnemonic.WordCount(rawValue: wordCount) else {
+            throw WalletError.configurationMissing(
+                "wordCount must be 12, 15, 18, 21, or 24; got \(wordCount)."
+            )
+        }
+        let words: [String]
+        do {
+            words = try HDWallet.generateMnemonic(language: .english, wordCount: wc)
+        } catch {
+            throw WalletError.derivationFailed("mnemonic generation failed: \(error)")
+        }
+        let phrase = words.joined(separator: " ")
+        let km = try await EncryptedKeyManager(
+            mnemonic: phrase,
+            passphrase: passphrase,
+            bip39Passphrase: bip39Passphrase,
+            iterations: iterations
+        )
+        return (km, phrase)
     }
 }
