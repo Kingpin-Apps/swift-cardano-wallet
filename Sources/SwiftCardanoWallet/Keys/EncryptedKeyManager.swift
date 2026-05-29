@@ -309,9 +309,9 @@ public actor EncryptedKeyManager: KeyManager {
     ///   - passphrase: protects the encrypted blob at rest. Must be non-empty.
     ///   - wordCount: 12 / 15 / 18 / 21 / 24. Defaults to 24.
     ///   - language: BIP-39 wordlist language. Defaults to
-    ///     ``SwiftMnemonic/Language/english``. **Only English is currently supported
-    ///     end-to-end** — see ``MnemonicWallet/generate(wordCount:language:network:provider:passphrase:accountIndex:utxoStore:gapLimit:handleResolver:)``
-    ///     for the upstream limitation.
+    ///     ``SwiftMnemonic/Language/english``. See
+    ///     ``MnemonicWallet/generate(wordCount:language:network:provider:passphrase:accountIndex:utxoStore:gapLimit:handleResolver:)``
+    ///     for notes on the per-language separator.
     ///   - bip39Passphrase: optional BIP-39 25th-word passphrase. Empty by default.
     ///   - iterations: PBKDF2-SHA512 iteration count. Defaults to
     ///     ``defaultIterations``; must be at least 100,000.
@@ -327,18 +327,14 @@ public actor EncryptedKeyManager: KeyManager {
                 "wordCount must be 12, 15, 18, 21, or 24; got \(wordCount)."
             )
         }
-        guard language == .english else {
-            throw WalletError.unsupportedOperation(
-                "Mnemonic generation in language \(language) is not yet supported end-to-end. Only .english works today."
-            )
-        }
         let words: [String]
         do {
             words = try HDWallet.generateMnemonic(language: language, wordCount: wc)
         } catch {
             throw WalletError.derivationFailed("mnemonic generation failed: \(error)")
         }
-        let phrase = words.joined(separator: " ")
+        let separator: String = language == .japanese ? "\u{3000}" : " "
+        let phrase = words.joined(separator: separator)
         let km = try await EncryptedKeyManager(
             mnemonic: phrase,
             passphrase: passphrase,

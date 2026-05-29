@@ -107,10 +107,11 @@ design — they wrap pre-existing key material (vkeys, key hashes, device-genera
 `.hwsfile`s) and there is no fresh-keypair operation to perform locally.
 
 `MnemonicWallet.generate` accepts a `wordCount:` of 12 / 15 / 18 / 21 / 24 (default 24)
-and a `language:` parameter (default `.english`). Non-English BIP-39 wordlists are
-recognized in the signature but currently throw `WalletError.unsupportedOperation` —
-upstream `HDWallet.fromMnemonic` validates against the English wordlist
-unconditionally, so only English round-trips today.
+and a `language:` parameter (default `.english`). All BIP-39 wordlists exposed by
+`swift-cardano-core` round-trip — English, Japanese, Spanish, French, Italian, Korean,
+Czech, Portuguese, and the two Chinese variants. Japanese phrases are joined with
+`U+3000 IDEOGRAPHIC SPACE` per BIP-39 and recover via NFKD normalization on the
+upstream side.
 `TextEnvelopeWallet` also exposes a `generateInMemory(...)` variant that hands back the
 raw 32-byte signing key payloads instead of writing them to disk, for callers that
 want to persist via a custom `KeyStore`.

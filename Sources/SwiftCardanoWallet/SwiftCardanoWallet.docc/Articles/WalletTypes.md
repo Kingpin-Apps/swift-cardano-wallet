@@ -53,7 +53,7 @@ To mint a **fresh** mnemonic wallet from scratch:
 ```swift
 let (wallet, phrase) = try await Wallet.generateMnemonic(
     wordCount: 24,                  // 12 / 15 / 18 / 21 / 24 (default 24)
-    language: .english,             // default; non-English currently throws — see note
+    language: .english,             // any BIP-39 wordlist swift-cardano-core supports
     network: .mainnet,
     provider: .blockfrost(projectId: "mainnet_…")
 )
@@ -61,12 +61,9 @@ let (wallet, phrase) = try await Wallet.generateMnemonic(
 // the keys are unrecoverable.
 ```
 
-> Non-English BIP-39 wordlists are accepted in the signature but throw
-> `WalletError.unsupportedOperation` at runtime: upstream
-> ``SwiftCardanoCore/HDWallet/fromMnemonic(mnemonic:passphrase:)`` validates the
-> supplied phrase against the English wordlist unconditionally, and Japanese phrases
-> use a different separator (`\u{3000}`) per BIP-39. The parameter exists so the
-> eventual fix is non-breaking.
+> Japanese phrases use `U+3000 IDEOGRAPHIC SPACE` as the canonical word separator per
+> BIP-39 — generation emits that form, and the upstream recovery path normalizes via
+> NFKD so either separator round-trips.
 
 ## Encrypted (passphrase-encrypted blob)
 

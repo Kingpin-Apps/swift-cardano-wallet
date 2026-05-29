@@ -237,25 +237,49 @@ struct MnemonicWalletTests {
         #expect(generated.language == .english)
     }
 
-    /// Non-English languages aren't supported end-to-end yet — see the docstring on
-    /// `MnemonicWallet.generate`. The API still accepts a `language:` argument so the
-    /// signature is forward-compatible.
-    @Test func generateRejectsNonEnglishLanguagesWithUnsupportedOperation() async throws {
+    /// Every BIP-39 language `swift-cardano-core` exposes must round-trip — phrase →
+    /// wallet → entropy → wallet from-entropy → same address. Locks in the upstream
+    /// fix from swift-cardano-core 0.4.4 (PR #1) that dropped the English-only
+    /// validation in `HDWallet.fromMnemonic`.
+    @Test func generateAcceptsEverySupportedLanguage() async throws {
         let stub = StubChainContext(networkId: .mainnet)
-        let unsupported: [SwiftMnemonic.Language] = [.japanese, .spanish, .french, .chinese_simplified]
-        for lang in unsupported {
-            do {
-                _ = try await MnemonicWallet.generate(
-                    language: lang,
-                    network: .mainnet,
-                    provider: .custom(make: { stub })
-                )
-                Issue.record("Expected unsupportedOperation for \(lang)")
-            } catch let error as WalletError {
-                if case .unsupportedOperation = error { /* expected */ } else {
-                    Issue.record("Unexpected error variant for \(lang): \(error)")
-                }
-            }
+        let languages: [SwiftMnemonic.Language] = [
+            .japanese,            // separator is U+3000 IDEOGRAPHIC SPACE
+            .spanish,
+            .french,
+            .italian,
+            .korean,
+            .czech,
+            .portuguese,
+            .chinese_simplified,
+            .chinese_traditional,
+        ]
+        for lang in languages {
+            let generated = try await MnemonicWallet.generate(
+                language: lang,
+                network: .mainnet,
+                provider: .custom(make: { stub })
+            )
+            #expect(generated.language == lang)
+            #expect(generated.phrase.isEmpty == false)
+            // Round-trip the wallet through entropy and confirm same address.
+            let derivedAddr = try await generated.wallet.receiveAddress()
+            #expect(try derivedAddr.toBech32().hasPrefix("addr1"))
+            #expect(generated.entropy.count == 32, "24-word phrase must decode to 32 bytes (got \(generated.entropy.count) for \(lang))")
         }
+    }
+
+    /// Japanese phrases are joined with `U+3000` IDEOGRAPHIC SPACE per BIP-39, but
+    /// upstream NFKD normalizes both separators to the same byte sequence on the
+    /// recovery path. Confirms `generate` emits the canonical Japanese form.
+    @Test func generatedJapanesePhraseUsesIdeographicSpaceSeparator() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let generated = try await MnemonicWallet.generate(
+            language: .japanese,
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        #expect(generated.phrase.contains("\u{3000}"))
+        #expect(generated.phrase.contains(" ") == false, "Japanese phrase should not contain ASCII spaces")
     }
 }

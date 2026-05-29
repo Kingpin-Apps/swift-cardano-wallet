@@ -137,13 +137,9 @@ public actor MnemonicWallet: WalletProtocol {
     ///   - wordCount: 12, 15, 18, 21, or 24. Defaults to 24 (256 bits of entropy — the
     ///     BIP-39 maximum). Anything else throws ``WalletError/configurationMissing(_:)``.
     ///   - language: BIP-39 wordlist language. Defaults to ``SwiftMnemonic/Language/english``.
-    ///     **Only English is currently supported end-to-end** — passing any other
-    ///     language throws ``WalletError/unsupportedOperation(_:)``. The upstream
-    ///     ``SwiftCardanoCore/HDWallet/fromMnemonic(mnemonic:passphrase:)`` validates
-    ///     the supplied phrase against the English wordlist unconditionally, and
-    ///     Japanese phrases additionally use `\u{3000}` as their word separator per
-    ///     BIP-39 — neither is yet wired up. The parameter exists so the eventual
-    ///     fix is non-breaking.
+    ///     Any language supported by ``SwiftCardanoCore/HDWallet`` works — the upstream
+    ///     auto-detects the wordlist on the recovery path, and Japanese phrases (which
+    ///     use `\u{3000}` per BIP-39) round-trip via NFKD normalization.
     ///   - network: target Cardano network.
     ///   - provider: chain backend.
     ///   - passphrase: optional BIP-39 passphrase ("25th word"). Empty by default.
@@ -167,18 +163,19 @@ public actor MnemonicWallet: WalletProtocol {
                 "wordCount must be 12, 15, 18, 21, or 24; got \(wordCount)."
             )
         }
-        guard language == .english else {
-            throw WalletError.unsupportedOperation(
-                "Mnemonic generation in language \(language) is not yet supported end-to-end (upstream HDWallet.fromMnemonic validates against the English wordlist unconditionally). Only .english works today."
-            )
-        }
         let words: [String]
         do {
             words = try HDWallet.generateMnemonic(language: language, wordCount: wc)
         } catch {
             throw WalletError.derivationFailed("mnemonic generation failed: \(error)")
         }
-        let phrase = words.joined(separator: " ")
+        // Japanese BIP-39 phrases use `\u{3000}` IDEOGRAPHIC SPACE as separator per
+        // spec; everything else uses ASCII space. Upstream normalizes both via NFKD
+        // when rebuilding from the phrase, so either join would work — but we emit
+        // the canonical form here so the phrase the caller backs up matches what
+        // other BIP-39 tools produce in the same language.
+        let separator: String = language == .japanese ? "\u{3000}" : " "
+        let phrase = words.joined(separator: separator)
 
         let wallet = try await MnemonicWallet(
             mnemonic: phrase,
