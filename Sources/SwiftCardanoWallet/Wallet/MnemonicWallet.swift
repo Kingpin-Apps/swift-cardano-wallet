@@ -136,6 +136,14 @@ public actor MnemonicWallet: WalletProtocol {
     /// - Parameters:
     ///   - wordCount: 12, 15, 18, 21, or 24. Defaults to 24 (256 bits of entropy — the
     ///     BIP-39 maximum). Anything else throws ``WalletError/configurationMissing(_:)``.
+    ///   - language: BIP-39 wordlist language. Defaults to ``SwiftMnemonic/Language/english``.
+    ///     **Only English is currently supported end-to-end** — passing any other
+    ///     language throws ``WalletError/unsupportedOperation(_:)``. The upstream
+    ///     ``SwiftCardanoCore/HDWallet/fromMnemonic(mnemonic:passphrase:)`` validates
+    ///     the supplied phrase against the English wordlist unconditionally, and
+    ///     Japanese phrases additionally use `\u{3000}` as their word separator per
+    ///     BIP-39 — neither is yet wired up. The parameter exists so the eventual
+    ///     fix is non-breaking.
     ///   - network: target Cardano network.
     ///   - provider: chain backend.
     ///   - passphrase: optional BIP-39 passphrase ("25th word"). Empty by default.
@@ -145,6 +153,7 @@ public actor MnemonicWallet: WalletProtocol {
     ///   - handleResolver: see init.
     public static func generate(
         wordCount: Int = 24,
+        language: Language = .english,
         network: Network,
         provider: ProviderConfig,
         passphrase: String = "",
@@ -158,9 +167,14 @@ public actor MnemonicWallet: WalletProtocol {
                 "wordCount must be 12, 15, 18, 21, or 24; got \(wordCount)."
             )
         }
+        guard language == .english else {
+            throw WalletError.unsupportedOperation(
+                "Mnemonic generation in language \(language) is not yet supported end-to-end (upstream HDWallet.fromMnemonic validates against the English wordlist unconditionally). Only .english works today."
+            )
+        }
         let words: [String]
         do {
-            words = try HDWallet.generateMnemonic(language: .english, wordCount: wc)
+            words = try HDWallet.generateMnemonic(language: language, wordCount: wc)
         } catch {
             throw WalletError.derivationFailed("mnemonic generation failed: \(error)")
         }
@@ -176,7 +190,7 @@ public actor MnemonicWallet: WalletProtocol {
             gapLimit: gapLimit,
             handleResolver: handleResolver
         )
-        return GeneratedMnemonicWallet(wallet: wallet, phrase: phrase)
+        return GeneratedMnemonicWallet(wallet: wallet, phrase: phrase, language: language)
     }
 }
 
@@ -188,17 +202,24 @@ public actor MnemonicWallet: WalletProtocol {
 /// `entropy` is the raw seed material the phrase encodes (16 / 20 / 24 / 28 / 32 bytes for
 /// 12 / 15 / 18 / 21 / 24 word counts). Equivalent to the phrase as far as wallet
 /// recovery is concerned; offered for callers that prefer to store the binary form.
+///
+/// `language` records which BIP-39 wordlist was used. Currently always
+/// ``SwiftMnemonic/Language/english`` because that's the only end-to-end-supported
+/// option (see ``MnemonicWallet/generate(wordCount:language:network:provider:passphrase:accountIndex:utxoStore:gapLimit:handleResolver:)``).
 public struct GeneratedMnemonicWallet: Sendable {
     public let wallet: MnemonicWallet
     public let phrase: String
+    public let language: Language
 
     /// Raw entropy backing ``phrase``. Lazily decoded from the phrase on demand.
     public var entropy: Data {
         // BIP-39 phrase → entropy is deterministic and cheap; decode on read so
         // callers that only care about `phrase` don't pay anything.
         do {
-            let words = phrase.split(separator: " ").map(String.init)
-            return try Mnemonic.toEntropy(words, wordlist: Language.english.words())
+            // Japanese splits on \u{3000}; everything else BIP-39 supports splits on ASCII space.
+            let separator: Character = language == .japanese ? "\u{3000}" : " "
+            let words = phrase.split(separator: separator).map(String.init)
+            return try Mnemonic.toEntropy(words, wordlist: language.words())
         } catch {
             // Phrase came from HDWallet.generateMnemonic; if decoding fails here the
             // upstream invariant is broken — surface a recognizable empty value rather
@@ -207,8 +228,9 @@ public struct GeneratedMnemonicWallet: Sendable {
         }
     }
 
-    public init(wallet: MnemonicWallet, phrase: String) {
+    public init(wallet: MnemonicWallet, phrase: String, language: Language = .english) {
         self.wallet = wallet
         self.phrase = phrase
+        self.language = language
     }
 }

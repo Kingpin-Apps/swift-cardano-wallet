@@ -1,6 +1,7 @@
 import Testing
 import SwiftCardanoCore
 import SwiftCardanoChain
+import SwiftMnemonic
 @testable import SwiftCardanoWallet
 
 private let testMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
@@ -214,6 +215,47 @@ struct MnemonicWalletTests {
                 provider: .custom(make: { stub })
             )
             #expect(generated.entropy.count == expectedBytes)
+        }
+    }
+
+    @Test func generateDefaultsToEnglishLanguage() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let generated = try await MnemonicWallet.generate(
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        #expect(generated.language == .english)
+    }
+
+    @Test func generateExplicitlyAcceptsEnglish() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let generated = try await MnemonicWallet.generate(
+            language: .english,
+            network: .mainnet,
+            provider: .custom(make: { stub })
+        )
+        #expect(generated.language == .english)
+    }
+
+    /// Non-English languages aren't supported end-to-end yet — see the docstring on
+    /// `MnemonicWallet.generate`. The API still accepts a `language:` argument so the
+    /// signature is forward-compatible.
+    @Test func generateRejectsNonEnglishLanguagesWithUnsupportedOperation() async throws {
+        let stub = StubChainContext(networkId: .mainnet)
+        let unsupported: [SwiftMnemonic.Language] = [.japanese, .spanish, .french, .chinese_simplified]
+        for lang in unsupported {
+            do {
+                _ = try await MnemonicWallet.generate(
+                    language: lang,
+                    network: .mainnet,
+                    provider: .custom(make: { stub })
+                )
+                Issue.record("Expected unsupportedOperation for \(lang)")
+            } catch let error as WalletError {
+                if case .unsupportedOperation = error { /* expected */ } else {
+                    Issue.record("Unexpected error variant for \(lang): \(error)")
+                }
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
 import SwiftCardanoUtils
+import SwiftMnemonic
 
 /// Top-level handle for any wallet type shipped by `SwiftCardanoWallet`. Unifies
 /// ``MnemonicWallet``, ``MultisigWallet``, and ``HardwareWallet`` behind one `Sendable`
@@ -422,9 +423,10 @@ public enum Wallet: Sendable {
     /// backupSheet.show(phrase: phrase)
     /// ```
     ///
-    /// - Parameters: see ``MnemonicWallet/generate(wordCount:network:provider:passphrase:accountIndex:utxoStore:gapLimit:handleResolver:)``.
+    /// - Parameters: see ``MnemonicWallet/generate(wordCount:language:network:provider:passphrase:accountIndex:utxoStore:gapLimit:handleResolver:)``.
     public static func generateMnemonic(
         wordCount: Int = 24,
+        language: Language = .english,
         network: Network,
         provider: ProviderConfig,
         passphrase: String = "",
@@ -435,6 +437,7 @@ public enum Wallet: Sendable {
     ) async throws -> (wallet: Wallet, phrase: String) {
         let generated = try await MnemonicWallet.generate(
             wordCount: wordCount,
+            language: language,
             network: network,
             provider: provider,
             passphrase: passphrase,
@@ -463,6 +466,7 @@ public enum Wallet: Sendable {
     public static func generateEncrypted(
         passphrase: String,
         wordCount: Int = 24,
+        language: Language = .english,
         network: Network,
         provider: ProviderConfig,
         bip39Passphrase: String = "",
@@ -475,6 +479,7 @@ public enum Wallet: Sendable {
         let (km, phrase) = try await EncryptedKeyManager.generate(
             passphrase: passphrase,
             wordCount: wordCount,
+            language: language,
             bip39Passphrase: bip39Passphrase,
             iterations: iterations
         )
