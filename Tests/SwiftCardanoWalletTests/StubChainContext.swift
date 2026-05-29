@@ -146,7 +146,7 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
 enum TestFixtures {
     static let dummyTxId = String(repeating: "ab", count: 32)
 
-    static func makeUTxO(at address: Address, lovelace: Int, index: UInt16 = 0) throws -> UTxO {
+    static func makeUTxO(at address: Address, lovelace: Int64, index: UInt16 = 0) throws -> UTxO {
         let txInput = try TransactionInput(from: dummyTxId, index: index)
         let txOutput = TransactionOutput(
             address: address,

@@ -11,7 +11,7 @@ struct MintTests {
 
     /// Build a wallet whose receive address holds enough ADA to cover the mint output
     /// + fee + change. 50 ADA is more than enough for any of the txs we build here.
-    private func wallet(funding: Int = 50_000_000, network: Network = .preprod) async throws
+    private func wallet(funding: Int64 = 50_000_000, network: Network = .preprod) async throws
     -> (wallet: MnemonicWallet, stub: StubChainContext, receive: Address)
     {
         let probe = try await MnemonicWallet(

@@ -98,7 +98,7 @@ public actor BalanceTracker {
         }
 
         let rewardAddr = try await account.rewardAddress(with: keyManager)
-        let rewards: Int
+        let rewards: Int64
         do {
             let info = try await chainContext.stakeAddressInfo(address: rewardAddr)
             rewards = info.first?.rewardAccountBalance ?? 0

@@ -310,7 +310,7 @@ public actor WatchOnlyWallet: WalletProtocol {
     /// Throws ``WalletError/configurationMissing(_:)`` when called on a wallet
     /// constructed from a reward-only stake address (no payment credential → no UTxOs to
     /// spend).
-    public func prepareSend(lovelace: Int, to address: Address) async throws -> PreparedTransaction {
+    public func prepareSend(lovelace: Int64, to address: Address) async throws -> PreparedTransaction {
         guard let observable = _address else {
             throw WalletError.configurationMissing(
                 "Cannot prepareSend from a reward-only WatchOnlyWallet; stake addresses don't hold UTxOs."

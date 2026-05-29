@@ -198,7 +198,7 @@ public actor HardwareWallet {
     /// action; for plain `prepareSend` we override to 1 and let coin selection account for
     /// fees on the lighter side).
     public func prepareSend(
-        lovelace: Int,
+        lovelace: Int64,
         to address: Address
     ) async throws -> PreparedHardwareTransaction {
         let utxoList = try await utxos()

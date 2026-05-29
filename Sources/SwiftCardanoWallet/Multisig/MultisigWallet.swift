@@ -104,7 +104,7 @@ public actor MultisigWallet {
     /// + ``PreparedMultisigTransaction/bodyHash``) to cosigners; collect their
     /// ``PartialWitness`` returns; then call ``PreparedMultisigTransaction/combine(_:)``.
     public func prepareSend(
-        lovelace: Int,
+        lovelace: Int64,
         to address: Address
     ) async throws -> PreparedMultisigTransaction {
         let utxoList = try await utxos()

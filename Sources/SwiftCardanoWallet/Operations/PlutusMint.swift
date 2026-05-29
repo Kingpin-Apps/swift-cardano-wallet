@@ -38,12 +38,12 @@ extension MnemonicWallet {
     ///   - additionalSigningPaths: Extra ``DerivationPath``s required by the policy
     ///     (besides the wallet's role-0 payment key, which is always added).
     public func prepareMint(
-        amount: Int,
+        amount: Int64,
         assetName: String,
         plutusPolicy: PlutusScript,
         redeemer: Redeemer? = nil,
         to: Address? = nil,
-        minOutputLovelace: Int = 2_000_000,
+        minOutputLovelace: Int64 = 2_000_000,
         metadata: [TransactionMetadatumLabel: TransactionMetadatum]? = nil,
         collateral: [UTxO]? = nil,
         additionalSigningPaths: [DerivationPath] = []
@@ -211,12 +211,12 @@ extension MnemonicWallet {
     /// Build, sign, and submit a Plutus-policy mint in one call.
     @discardableResult
     public func mint(
-        amount: Int,
+        amount: Int64,
         assetName: String,
         plutusPolicy: PlutusScript,
         redeemer: Redeemer? = nil,
         to: Address? = nil,
-        minOutputLovelace: Int = 2_000_000,
+        minOutputLovelace: Int64 = 2_000_000,
         metadata: [TransactionMetadatumLabel: TransactionMetadatum]? = nil,
         collateral: [UTxO]? = nil,
         additionalSigningPaths: [DerivationPath] = []

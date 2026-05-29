@@ -10,7 +10,7 @@ private let testMnemonic = "abandon abandon abandon abandon abandon abandon aban
 struct SendTests {
 
     /// Helper: build a wallet whose receive address has a 10 ADA UTxO.
-    private func wallet(withFunding lovelace: Int, network: Network = .preprod) async throws
+    private func wallet(withFunding lovelace: Int64, network: Network = .preprod) async throws
     -> (wallet: MnemonicWallet, stub: StubChainContext, receive: Address)
     {
         let probe = try await MnemonicWallet(
@@ -132,8 +132,8 @@ struct SendTests {
     /// Build a wallet that has UTxOs at *two* derived addresses (external 0 and change 0)
     /// with funding at each, so coin selection is forced to pull from both.
     private func multiAddressWallet(
-        externalLovelace: Int = 4_000_000,
-        changeLovelace: Int = 4_000_000,
+        externalLovelace: Int64 = 4_000_000,
+        changeLovelace: Int64 = 4_000_000,
         network: Network = .preprod
     ) async throws -> (wallet: MnemonicWallet, stub: StubChainContext, external: Address, change: Address) {
         let probe = try await MnemonicWallet(

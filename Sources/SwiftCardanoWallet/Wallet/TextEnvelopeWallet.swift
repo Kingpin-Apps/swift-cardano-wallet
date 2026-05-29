@@ -147,7 +147,7 @@ public actor TextEnvelopeWallet: WalletProtocol {
     // MARK: - Send
 
     /// Build an unsigned send transaction.
-    public func prepareSend(lovelace: Int, to address: Address) async throws -> PreparedTransaction {
+    public func prepareSend(lovelace: Int64, to address: Address) async throws -> PreparedTransaction {
         let utxoList = try await utxos()
         guard !utxoList.isEmpty else {
             throw WalletError.insufficientFunds(required: UInt64(lovelace), available: 0)
@@ -199,7 +199,7 @@ public actor TextEnvelopeWallet: WalletProtocol {
 
     /// One-shot: build, sign, submit.
     @discardableResult
-    public func send(lovelace: Int, to address: Address) async throws -> String {
+    public func send(lovelace: Int64, to address: Address) async throws -> String {
         let prepared = try await prepareSend(lovelace: lovelace, to: address)
         let signed = try await prepared.sign()
         return try await signed.submit()

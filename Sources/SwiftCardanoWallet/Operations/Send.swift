@@ -11,7 +11,7 @@ extension MnemonicWallet {
     ///   - lovelace: the amount, in lovelace, to send.
     ///   - to: destination address.
     /// - Returns: a ``PreparedTransaction`` that can be signed and submitted (or exported).
-    public func prepareSend(lovelace: Int, to address: Address) async throws -> PreparedTransaction {
+    public func prepareSend(lovelace: Int64, to address: Address) async throws -> PreparedTransaction {
         let change = try await changeAddress()
 
         let context = chainContextHandle()
@@ -132,7 +132,7 @@ extension MnemonicWallet {
 
     /// One-shot: build, sign, submit. Returns the transaction id reported by the chain backend.
     @discardableResult
-    public func send(lovelace: Int, to address: Address) async throws -> String {
+    public func send(lovelace: Int64, to address: Address) async throws -> String {
         let prepared = try await prepareSend(lovelace: lovelace, to: address)
         let signed = try await prepared.sign()
         return try await signed.submit()

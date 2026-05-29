@@ -10,7 +10,7 @@ private let testMnemonic = "abandon abandon abandon abandon abandon abandon aban
 struct GovernanceTests {
 
     private func wallet(
-        funding: Int = 5_000_000_000,
+        funding: Int64 = 5_000_000_000,
         network: Network = .preprod
     ) async throws -> (wallet: MnemonicWallet, stub: StubChainContext, receive: Address) {
         let probe = try await MnemonicWallet(

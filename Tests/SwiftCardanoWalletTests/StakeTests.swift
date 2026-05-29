@@ -14,7 +14,7 @@ struct StakeTests {
 
     /// Build a wallet whose receive address holds enough lovelace to cover all stake-tx fees + deposit.
     private func wallet(
-        funding: Int = 5_000_000_000,
+        funding: Int64 = 5_000_000_000,
         stakeInfo: [StakeAddressInfo]? = nil,
         network: Network = .preprod
     ) async throws -> (wallet: MnemonicWallet, stub: StubChainContext, receive: Address, reward: Address) {
@@ -94,7 +94,7 @@ struct StakeTests {
     // MARK: - Delegation
 
     /// The delegation shortcut's chain check requires the stake address to already be registered.
-    private func registeredStakeInfo(rewards: Int = 0) -> StakeAddressInfo {
+    private func registeredStakeInfo(rewards: Int64 = 0) -> StakeAddressInfo {
         StakeAddressInfo(
             active: true,
             activeEpoch: 50,

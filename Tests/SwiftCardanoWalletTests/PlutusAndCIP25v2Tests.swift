@@ -140,7 +140,7 @@ struct PlutusMintTests {
 
     /// Build a wallet with funding + a pure-ADA UTxO for collateral.
     private func wallet(
-        funding: Int = 100_000_000,
+        funding: Int64 = 100_000_000,
         network: Network = .preprod
     ) async throws -> (wallet: MnemonicWallet, stub: StubChainContext, receive: Address) {
         let probe = try await MnemonicWallet(

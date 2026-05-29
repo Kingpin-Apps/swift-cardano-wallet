@@ -23,11 +23,11 @@ extension MnemonicWallet {
     ///   - additionalSigningPaths: Extra wallet ``DerivationPath``s required by the policy
     ///         (besides the wallet's role-0 payment key, which is always added).
     public func prepareMint(
-        amount: Int,
+        amount: Int64,
         assetName: String,
         policy: NativeScript,
         to: Address? = nil,
-        minOutputLovelace: Int = 2_000_000,
+        minOutputLovelace: Int64 = 2_000_000,
         metadata: [TransactionMetadatumLabel: TransactionMetadatum]? = nil,
         additionalSigningPaths: [DerivationPath] = []
     ) async throws -> PreparedTransaction {
@@ -132,7 +132,7 @@ extension MnemonicWallet {
     /// of `assetName` under `policy`. The wallet must already hold at least `amount` of the
     /// asset, otherwise build will fail at coin-selection.
     public func prepareBurn(
-        amount: Int,
+        amount: Int64,
         assetName: String,
         policy: NativeScript,
         additionalSigningPaths: [DerivationPath] = []
@@ -187,7 +187,7 @@ extension MnemonicWallet {
         let policy = NativeScript.scriptAll(
             ScriptAll(scripts: [
                 .scriptPubkey(ScriptPubkey(keyHash: keyHash)),
-                .invalidHereAfter(AfterScript(slot: ttlSlot)),
+                .invalidHereAfter(AfterScript(slot: SlotNumber(ttlSlot))),
             ])
         )
 
@@ -216,7 +216,7 @@ extension MnemonicWallet {
 
     @discardableResult
     public func mint(
-        amount: Int,
+        amount: Int64,
         assetName: String,
         policy: NativeScript,
         to: Address? = nil,
@@ -235,7 +235,7 @@ extension MnemonicWallet {
 
     @discardableResult
     public func burn(
-        amount: Int,
+        amount: Int64,
         assetName: String,
         policy: NativeScript,
         additionalSigningPaths: [DerivationPath] = []

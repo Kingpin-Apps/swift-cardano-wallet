@@ -15,7 +15,7 @@ private let testWalletInfo = WalletInfo(
 @Suite("MnemonicWallet.cip30Provider builds a KeyStoreCIP30Provider")
 struct CIP30Tests {
 
-    private func wallet(funding: Int = 10_000_000, network: Network = .preprod)
+    private func wallet(funding: Int64 = 10_000_000, network: Network = .preprod)
     async throws -> (wallet: MnemonicWallet, stub: StubChainContext, receive: Address)
     {
         let probe = try await MnemonicWallet(

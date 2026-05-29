@@ -21,7 +21,7 @@ extension MnemonicWallet {
     /// behind an ADA Handle. Convenience over `prepareSend(lovelace:to:)`.
     public func prepareSendTo(
         handle: String,
-        lovelace: Int
+        lovelace: Int64
     ) async throws -> PreparedTransaction {
         let address = try await resolveHandle(handle)
         return try await prepareSend(lovelace: lovelace, to: address)
@@ -30,7 +30,7 @@ extension MnemonicWallet {
     /// One-shot: resolve, build, sign, submit. Returns the transaction id reported by the
     /// chain backend.
     @discardableResult
-    public func sendTo(handle: String, lovelace: Int) async throws -> String {
+    public func sendTo(handle: String, lovelace: Int64) async throws -> String {
         let prepared = try await prepareSendTo(handle: handle, lovelace: lovelace)
         let signed = try await prepared.sign()
         return try await signed.submit()
