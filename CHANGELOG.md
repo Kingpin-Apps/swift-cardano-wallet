@@ -1,3 +1,9 @@
+## 1.1.1 (2026-05-31)
+
+### Fix
+
+- update SwiftCardanoCIPS
+
 ## 1.1.0 (2026-05-29)
 
 ### Feat
