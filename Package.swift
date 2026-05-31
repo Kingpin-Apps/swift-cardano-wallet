@@ -27,13 +27,9 @@ let package = Package(
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git", from: "1.0.0"),
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txvalidator.git", from: "0.2.0"),
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-utils.git", from: "0.5.1"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.3.2"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.3.3"),
         .package(url: "https://github.com/Kingpin-Apps/swift-handles-api.git", from: "0.1.1"),
         .package(url: "https://github.com/Kingpin-Apps/swift-gnupg.git", from: "0.1.3"),
-        // SwiftMnemonic is also a transitive dep via swift-cardano-core; we depend on it
-        // directly so wallet-generation entry points (MnemonicWallet.generate, etc.) can
-        // reference WordCount / Language explicitly without relying on transitive
-        // visibility.
         .package(url: "https://github.com/Kingpin-Apps/swift-mnemonic.git", from: "0.2.5"),
         // SQLite backend for SQLiteUTxOStore. Only linked when the `SQLite` package trait is enabled.
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.15.3"),
