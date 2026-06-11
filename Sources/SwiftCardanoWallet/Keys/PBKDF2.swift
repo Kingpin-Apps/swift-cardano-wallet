@@ -1,5 +1,9 @@
 import Foundation
+#if os(Linux)
+import Crypto
+#else
 import CryptoKit
+#endif
 
 /// Minimal PBKDF2-HMAC-SHA512 implementation. CryptoKit doesn't expose PBKDF2 directly
 /// (only HKDF, which isn't a password-stretching KDF), so we build it on top of `HMAC<SHA512>`.

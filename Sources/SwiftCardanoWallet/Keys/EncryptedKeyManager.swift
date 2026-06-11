@@ -1,6 +1,10 @@
 import Foundation
+#if os(Linux)
+import Crypto
+#else
 import CryptoKit
 import Security
+#endif
 import OrderedCollections
 import SwiftCardanoCore
 import SwiftMnemonic
@@ -206,6 +210,10 @@ public actor EncryptedKeyManager: KeyManager {
     // MARK: - Internals
 
     private static func randomBytes(_ length: Int) -> Data {
+        #if os(Linux)
+        var rng = SystemRandomNumberGenerator()
+        return Data((0..<length).map { _ in UInt8.random(in: .min ... .max, using: &rng) })
+        #else
         var bytes = Data(count: length)
         let result = bytes.withUnsafeMutableBytes { ptr -> Int32 in
             guard let base = ptr.baseAddress else { return -1 }
@@ -213,6 +221,7 @@ public actor EncryptedKeyManager: KeyManager {
         }
         precondition(result == errSecSuccess, "SecRandomCopyBytes failed: \(result)")
         return bytes
+        #endif
     }
 
     /// NFKC-normalize the passphrase before feeding it to PBKDF2. Matches BIP-39's own

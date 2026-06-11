@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(Glibc)
+import Glibc
+#endif
 
 extension Data {
     /// Overwrite the buffer with zeros, attempting to resist dead-store elimination
@@ -22,7 +25,11 @@ extension Data {
         let length = count
         withUnsafeMutableBytes { raw in
             guard let base = raw.baseAddress else { return }
+            #if canImport(Glibc)
+            explicit_bzero(base, length)
+            #else
             _ = memset_s(base, length, 0, length)
+            #endif
         }
     }
 }

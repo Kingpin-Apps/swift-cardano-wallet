@@ -1,6 +1,10 @@
 import Testing
 import Foundation
+#if os(Linux)
+import Crypto
+#else
 import CryptoKit
+#endif
 import SwiftCardanoCore
 @testable import SwiftCardanoWallet
 
