@@ -160,15 +160,40 @@ public actor TextEnvelopeKeyManager: KeyManager {
         }
     }
 
+    // MARK: - Parsing
+
+    /// Which role a `.skey` file is expected to carry — payment or stake.
+    public enum SkeyRole: Sendable {
+        case payment, stake
+    }
+
+    /// The raw signing material extracted from a TextEnvelope `.skey` file: the payload bytes and
+    /// whether the key is an extended (Ed25519-BIP32, 128-byte) or plain (Ed25519, 32-byte) key.
+    /// Feed these straight into ``init(paymentPayload:paymentIsExtended:stakePayload:stakeIsExtended:)``
+    /// or persist them (encrypted) for later reconstruction — no temp file ever required.
+    public struct ParsedSkey: Sendable, Equatable {
+        public let payload: Data
+        public let isExtended: Bool
+
+        public init(payload: Data, isExtended: Bool) {
+            self.payload = payload
+            self.isExtended = isExtended
+        }
+    }
+
+    /// Parse the bytes of a `cardano-cli` TextEnvelope `.skey` file into its raw signing payload,
+    /// validating that the envelope `type` matches the expected `role`. Purely in-memory: lets an
+    /// app read a user-supplied `.skey`, seal the payload, and never write the plaintext key to disk.
+    public static func parseSkey(_ data: Data, role: SkeyRole) throws -> ParsedSkey {
+        let loaded = try loadSkey(data: data, expecting: role, source: "<data>")
+        return ParsedSkey(payload: loaded.payload, isExtended: loaded.isExtended)
+    }
+
     // MARK: - File loading
 
     private struct LoadedSkey {
         let payload: Data
         let isExtended: Bool
-    }
-
-    private enum ExpectedKind {
-        case payment, stake
     }
 
     private struct TextEnvelopeFile: Decodable {
@@ -177,18 +202,22 @@ public actor TextEnvelopeKeyManager: KeyManager {
         let cborHex: String
     }
 
-    private static func loadSkey(from url: URL, expecting kind: ExpectedKind) throws -> LoadedSkey {
+    private static func loadSkey(from url: URL, expecting kind: SkeyRole) throws -> LoadedSkey {
         let data: Data
         do {
             data = try Data(contentsOf: url)
         } catch {
             throw WalletError.configurationMissing("Cannot read \(url.path): \(error)")
         }
+        return try loadSkey(data: data, expecting: kind, source: url.path)
+    }
+
+    private static func loadSkey(data: Data, expecting kind: SkeyRole, source: String) throws -> LoadedSkey {
         let envelope: TextEnvelopeFile
         do {
             envelope = try JSONDecoder().decode(TextEnvelopeFile.self, from: data)
         } catch {
-            throw WalletError.configurationMissing("Not a valid TextEnvelope file at \(url.path): \(error)")
+            throw WalletError.configurationMissing("Not a valid TextEnvelope file at \(source): \(error)")
         }
 
         let acceptedTypes: [String]
@@ -206,7 +235,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
         }
         guard acceptedTypes.contains(envelope.type) else {
             throw WalletError.configurationMissing(
-                "TextEnvelope at \(url.path) has unsupported type '\(envelope.type)' (expected one of \(acceptedTypes))"
+                "TextEnvelope at \(source) has unsupported type '\(envelope.type)' (expected one of \(acceptedTypes))"
             )
         }
 

@@ -116,6 +116,61 @@ struct TextEnvelopeKeyManagerTests {
         }
     }
 
+    // MARK: - parseSkey (in-memory)
+
+    /// Build TextEnvelope `.skey` JSON bytes (no file) for the parse tests.
+    private func textEnvelopeData(type: String, description: String, payload: Data) throws -> Data {
+        var cbor = Data([0x58, UInt8(payload.count)])
+        cbor.append(payload)
+        let json: [String: String] = ["type": type, "description": description, "cborHex": hexEncode(cbor)]
+        return try JSONSerialization.data(withJSONObject: json)
+    }
+
+    @Test func parseSkeyExtractsPayloadAndReconstructsSameManager() async throws {
+        let mnemonicKM = try MnemonicKeyManager(mnemonic: testMnemonic)
+        let paymentExt = try await mnemonicKM.paymentSigningKey(at: .payment(account: 0, index: 0))
+        let stakeExt = try await mnemonicKM.stakeSigningKey(at: .stake(account: 0, index: 0))
+
+        let paymentData = try textEnvelopeData(
+            type: PaymentExtendedSigningKey.TYPE,
+            description: PaymentExtendedSigningKey.DESCRIPTION,
+            payload: paymentExt.payload
+        )
+        let stakeData = try textEnvelopeData(
+            type: StakeExtendedSigningKey.TYPE,
+            description: StakeExtendedSigningKey.DESCRIPTION,
+            payload: stakeExt.payload
+        )
+
+        let payment = try TextEnvelopeKeyManager.parseSkey(paymentData, role: .payment)
+        let stake = try TextEnvelopeKeyManager.parseSkey(stakeData, role: .stake)
+        #expect(payment.isExtended)
+        #expect(payment.payload == paymentExt.payload)
+        #expect(stake.payload == stakeExt.payload)
+
+        // Reconstruct from parsed payloads and confirm the same address as the mnemonic KM.
+        let teKM = TextEnvelopeKeyManager(
+            paymentPayload: payment.payload,
+            paymentIsExtended: payment.isExtended,
+            stakePayload: stake.payload,
+            stakeIsExtended: stake.isExtended
+        )
+        let acct = Account(network: .mainnet)
+        #expect(try await acct.address(with: mnemonicKM) == (try await acct.address(with: teKM)))
+    }
+
+    @Test func parseSkeyRejectsWrongRole() throws {
+        let paymentData = try textEnvelopeData(
+            type: PaymentSigningKey.TYPE,
+            description: PaymentSigningKey.DESCRIPTION,
+            payload: Data(repeating: 3, count: 32)
+        )
+        // A payment envelope parsed as a stake key must throw.
+        #expect(throws: WalletError.self) {
+            _ = try TextEnvelopeKeyManager.parseSkey(paymentData, role: .stake)
+        }
+    }
+
     @Test func stakeRequestWithoutStakeFileThrows() async throws {
         let mnemonicKM = try MnemonicKeyManager(mnemonic: testMnemonic)
         let paymentExtSkey = try await mnemonicKM.paymentSigningKey(at: .payment())
