@@ -1,3 +1,9 @@
+## 1.2.0 (2026-07-08)
+
+### Feat
+
+- gate hardware-wallet path behind Hardware trait; drop unused GnuPG dep; declare iOS 18
+
 ## 1.1.2 (2026-06-11)
 
 ### Fix
