@@ -1,3 +1,9 @@
+## 1.3.0 (2026-07-08)
+
+### Feat
+
+- **keys**: add SecretBox generic seal/open + TextEnvelopeKeyManager.parseSkey
+
 ## 1.2.0 (2026-07-08)
 
 ### Feat
