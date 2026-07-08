@@ -22,7 +22,9 @@ struct WalletEnumTests {
         #expect(wallet.network == .preprod)
         #expect(wallet.mnemonicWallet != nil)
         #expect(wallet.multisigWallet == nil)
+        #if HARDWARE
         #expect(wallet.hardwareWallet == nil)
+        #endif
     }
 
     @Test func multisigFactoryBuildsAndWraps() async throws {

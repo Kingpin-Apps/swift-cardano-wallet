@@ -1,3 +1,4 @@
+#if HARDWARE // hardware-wallet path (cardano-hw-cli via SwiftCardanoUtils) — macOS/Linux, trait-gated
 import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
@@ -251,3 +252,5 @@ public actor HardwareWallet {
         )
     }
 }
+
+#endif

@@ -1,3 +1,4 @@
+#if HARDWARE // hardware-wallet tests — Hardware trait only
 import Testing
 import Foundation
 import SwiftCardanoCore
@@ -343,3 +344,5 @@ struct HardwareWalletTests {
         }
     }
 }
+
+#endif

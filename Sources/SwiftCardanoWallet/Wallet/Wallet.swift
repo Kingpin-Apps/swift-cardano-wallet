@@ -1,7 +1,9 @@
 import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
+#if HARDWARE
 import SwiftCardanoUtils
+#endif
 import SwiftMnemonic
 
 /// Top-level handle for any wallet type shipped by `SwiftCardanoWallet`. Unifies
@@ -51,8 +53,10 @@ public enum Wallet: Sendable {
     /// Native-script multisig vault. Sibling type with its own ``PartialWitness`` flow.
     case multisig(MultisigWallet)
 
-    /// Hardware wallet driven through `cardano-hw-cli`. macOS / Linux only.
+    /// Hardware wallet driven through `cardano-hw-cli`. macOS / Linux only; trait-gated.
+    #if HARDWARE
     case hardware(HardwareWallet)
+    #endif
 
     // MARK: - Common reads
 
@@ -63,7 +67,9 @@ public enum Wallet: Sendable {
         case .textEnvelope(let w): return w.kind
         case .watchOnly(let w): return w.kind
         case .multisig(let w): return w.kind
+        #if HARDWARE
         case .hardware(let w): return w.kind
+        #endif
         }
     }
 
@@ -74,7 +80,9 @@ public enum Wallet: Sendable {
         case .textEnvelope(let w): return w.network
         case .watchOnly(let w): return w.network
         case .multisig(let w): return w.policy.network
+        #if HARDWARE
         case .hardware(let w): return w.network
+        #endif
         }
     }
 
@@ -92,7 +100,9 @@ public enum Wallet: Sendable {
         case .textEnvelope(let w): return try await w.receiveAddress()
         case .watchOnly(let w): return try await w.receiveAddress()
         case .multisig(let w): return w.address
+        #if HARDWARE
         case .hardware(let w): return w.address
+        #endif
         }
     }
 
@@ -107,7 +117,9 @@ public enum Wallet: Sendable {
         case .textEnvelope(let w): return try await w.utxos()
         case .watchOnly(let w): return try await w.utxos()
         case .multisig(let w): return try await w.utxos()
+        #if HARDWARE
         case .hardware(let w): return try await w.utxos()
+        #endif
         }
     }
 
@@ -118,7 +130,9 @@ public enum Wallet: Sendable {
         case .textEnvelope(let w): return try await w.balance()
         case .watchOnly(let w): return try await w.balance()
         case .multisig(let w): return try await w.balance()
+        #if HARDWARE
         case .hardware(let w): return try await w.balance()
+        #endif
         }
     }
 
@@ -129,7 +143,9 @@ public enum Wallet: Sendable {
         case .textEnvelope(let w): return w.chainContextHandle()
         case .watchOnly(let w): return w.chainContextHandle()
         case .multisig(let w): return w.chainContextHandle()
+        #if HARDWARE
         case .hardware(let w): return w.chainContextHandle()
+        #endif
         }
     }
 
@@ -159,11 +175,13 @@ public enum Wallet: Sendable {
         return nil
     }
 
+    #if HARDWARE
     /// The wrapped ``HardwareWallet`` or `nil`.
     public var hardwareWallet: HardwareWallet? {
         if case .hardware(let w) = self { return w }
         return nil
     }
+    #endif
 
     /// `true` if this wallet kind can produce signatures locally. Watch-only wallets
     /// return `false`; everything else returns `true` (multisig / hardware sign through
@@ -171,7 +189,11 @@ public enum Wallet: Sendable {
     public var canSign: Bool {
         switch self {
         case .watchOnly: return false
+        #if HARDWARE
         case .mnemonic, .textEnvelope, .multisig, .hardware: return true
+        #else
+        case .mnemonic, .textEnvelope, .multisig: return true
+        #endif
         }
     }
 
@@ -203,10 +225,12 @@ public enum Wallet: Sendable {
             throw WalletError.unsupportedOperation(
                 "Multisig sends need cosigner partial witnesses. Use `wallet.multisigWallet?.prepareSend(...)` then collect and combine PartialWitnesses."
             )
+        #if HARDWARE
         case .hardware:
             throw WalletError.unsupportedOperation(
                 "Hardware wallet sends need device interaction. Use `wallet.hardwareWallet?.prepareSend(...)` then `signWithDevice()` or `attachWitnesses(fromFiles:)`."
             )
+        #endif
         }
     }
 
@@ -220,10 +244,17 @@ public enum Wallet: Sendable {
             return try await w.sendTo(handle: handle, lovelace: lovelace)
         case .watchOnly:
             throw WalletError.watchOnly
+        #if HARDWARE
         case .textEnvelope, .multisig, .hardware:
             throw WalletError.unsupportedOperation(
                 "sendTo(handle:) is only wired up for mnemonic wallets in v0.1.0. Resolve the handle yourself via DefaultHandleResolver and pass the resulting Address to the concrete wallet's prepareSend."
             )
+        #else
+        case .textEnvelope, .multisig:
+            throw WalletError.unsupportedOperation(
+                "sendTo(handle:) is only wired up for mnemonic wallets in v0.1.0. Resolve the handle yourself via DefaultHandleResolver and pass the resulting Address to the concrete wallet's prepareSend."
+            )
+        #endif
         }
     }
 
@@ -390,6 +421,7 @@ public enum Wallet: Sendable {
         return .multisig(w)
     }
 
+    #if HARDWARE
     /// Build a hardware wallet (requires `cardano-hw-cli` for the device flow; the
     /// manual-flow path works without).
     public static func hardware(
@@ -408,6 +440,7 @@ public enum Wallet: Sendable {
         )
         return .hardware(w)
     }
+    #endif
 
     // MARK: - Generation
 
