@@ -86,6 +86,81 @@ extension MnemonicWallet {
         )
     }
 
+    /// Prepare a transaction with **arbitrary outputs** and optional **metadata**, **certificates**,
+    /// and **TTL** — the composable primitive behind rich sends (multi-recipient, native-asset
+    /// outputs, on-chain messages, stake certificates). Reuses the same coin selection and
+    /// signing-path derivation as ``prepareSend(lovelace:to:)``.
+    ///
+    /// - When `certificates` are present, the stake signing path is added so stake/DRep-adjacent
+    ///   certificates are witnessed (DRep-key signing itself is gated until governance-key support).
+    public func prepareTransaction(
+        outputs: [TransactionOutput],
+        auxiliaryData: AuxiliaryData? = nil,
+        certificates: [Certificate]? = nil,
+        ttl: SlotNumber? = nil
+    ) async throws -> PreparedTransaction {
+        guard !outputs.isEmpty else {
+            throw WalletError.configurationMissing("A transaction needs at least one output.")
+        }
+        let change = try await changeAddress()
+        let context = chainContextHandle()
+        let utxoList = try await utxos()
+        guard !utxoList.isEmpty else {
+            throw WalletError.insufficientFunds(required: 0, available: 0)
+        }
+
+        let candidateAddresses = Set(utxoList.map(\.output.address))
+        let builder = TxBuilder(context: context)
+        builder.witnessOverride = max(1, min(candidateAddresses.count, 4))
+        builder.potentialInputs = utxoList
+        for output in outputs {
+            _ = try builder.addOutput(output)
+        }
+        builder.auxiliaryData = auxiliaryData
+        builder.certificates = certificates
+        builder.ttl = ttl
+
+        let body: TransactionBody
+        do {
+            body = try await builder.build(changeAddress: change)
+        } catch {
+            let total = utxoList.reduce(0) { $0 + $1.output.amount.coin }
+            let required = outputs.reduce(Int64(0)) { $0 + $1.amount.coin }
+            if total < required {
+                throw WalletError.insufficientFunds(required: UInt64(required), available: UInt64(max(0, total)))
+            }
+            throw WalletError.wrappingValidation(error)
+        }
+
+        let witnessSet: TransactionWitnessSet
+        do {
+            witnessSet = try builder.buildWitnessSet()
+        } catch {
+            throw WalletError.wrappingValidation(error)
+        }
+
+        let unsigned = Transaction(
+            transactionBody: body,
+            transactionWitnessSet: witnessSet,
+            auxiliaryData: builder.auxiliaryData
+        )
+
+        var signingPaths = try await derivePaymentPaths(
+            forInputs: body.inputs.asArray,
+            candidates: utxoList
+        )
+        if certificates?.isEmpty == false {
+            signingPaths.append(account.stakePath())
+        }
+
+        return PreparedTransaction(
+            transaction: unsigned,
+            signingPaths: signingPaths,
+            chainContext: context,
+            keyManager: keyManager
+        )
+    }
+
     /// One Web of Trust between coin selection and signing: figure out which addresses the
     /// chosen inputs came from, then ask the ``BalanceTracker`` for their derivation paths.
     /// Throws if any input can't be resolved (paranoid; shouldn't happen in practice
