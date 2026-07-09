@@ -95,6 +95,7 @@ extension MnemonicWallet {
     ///   certificates are witnessed (DRep-key signing itself is gated until governance-key support).
     public func prepareTransaction(
         outputs: [TransactionOutput],
+        inputs: [UTxO]? = nil,
         auxiliaryData: AuxiliaryData? = nil,
         certificates: [Certificate]? = nil,
         ttl: SlotNumber? = nil
@@ -109,10 +110,18 @@ extension MnemonicWallet {
             throw WalletError.insufficientFunds(required: 0, available: 0)
         }
 
-        let candidateAddresses = Set(utxoList.map(\.output.address))
+        // Coin control: when `inputs` is given, spend exactly those UTxOs (forced); otherwise let
+        // coin selection pick from the full tracked set.
+        let forced = (inputs?.isEmpty == false) ? inputs! : nil
+        let sources = forced ?? utxoList
+        let candidateAddresses = Set(sources.map(\.output.address))
         let builder = TxBuilder(context: context)
         builder.witnessOverride = max(1, min(candidateAddresses.count, 4))
-        builder.potentialInputs = utxoList
+        if let forced {
+            for utxo in forced { _ = builder.addInput(utxo) }
+        } else {
+            builder.potentialInputs = utxoList
+        }
         for output in outputs {
             _ = try builder.addOutput(output)
         }
@@ -124,7 +133,7 @@ extension MnemonicWallet {
         do {
             body = try await builder.build(changeAddress: change)
         } catch {
-            let total = utxoList.reduce(0) { $0 + $1.output.amount.coin }
+            let total = sources.reduce(0) { $0 + $1.output.amount.coin }
             let required = outputs.reduce(Int64(0)) { $0 + $1.amount.coin }
             if total < required {
                 throw WalletError.insufficientFunds(required: UInt64(required), available: UInt64(max(0, total)))
@@ -147,7 +156,7 @@ extension MnemonicWallet {
 
         var signingPaths = try await derivePaymentPaths(
             forInputs: body.inputs.asArray,
-            candidates: utxoList
+            candidates: sources
         )
         if certificates?.isEmpty == false {
             signingPaths.append(account.stakePath())
