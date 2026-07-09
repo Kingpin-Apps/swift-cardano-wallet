@@ -170,6 +170,63 @@ extension MnemonicWallet {
         )
     }
 
+    /// Consolidate scattered UTxOs into a **single output** at the change address. Spends the given
+    /// `inputs` — or *all* tracked UTxOs when `nil` — and returns everything, minus fee, as one
+    /// change UTxO (native assets included). Defragments a wallet whose funds are spread across many
+    /// small UTxOs, lowering the input count (and fee) of future transactions.
+    ///
+    /// There are no explicit outputs: the entire selected balance flows to change, so the result is
+    /// exactly one UTxO. Fails if the consolidated balance is below the min-ADA a UTxO must hold.
+    public func prepareConsolidation(inputs: [UTxO]? = nil) async throws -> PreparedTransaction {
+        let change = try await changeAddress()
+        let context = chainContextHandle()
+        let utxoList = try await utxos()
+        guard !utxoList.isEmpty else {
+            throw WalletError.insufficientFunds(required: 0, available: 0)
+        }
+
+        // Spend exactly the chosen UTxOs (forced), or the whole tracked set when none are given.
+        let sources = (inputs?.isEmpty == false) ? inputs! : utxoList
+        let candidateAddresses = Set(sources.map(\.output.address))
+        let builder = TxBuilder(context: context)
+        builder.witnessOverride = max(1, min(candidateAddresses.count, 4))
+        for utxo in sources { _ = builder.addInput(utxo) }
+        // Deliberately no `addOutput`: with only inputs, `build` sends the full balance (minus fee)
+        // to a single change output.
+
+        let body: TransactionBody
+        do {
+            body = try await builder.build(changeAddress: change)
+        } catch {
+            throw WalletError.wrappingValidation(error)
+        }
+
+        let witnessSet: TransactionWitnessSet
+        do {
+            witnessSet = try builder.buildWitnessSet()
+        } catch {
+            throw WalletError.wrappingValidation(error)
+        }
+
+        let unsigned = Transaction(
+            transactionBody: body,
+            transactionWitnessSet: witnessSet,
+            auxiliaryData: builder.auxiliaryData
+        )
+
+        let signingPaths = try await derivePaymentPaths(
+            forInputs: body.inputs.asArray,
+            candidates: sources
+        )
+
+        return PreparedTransaction(
+            transaction: unsigned,
+            signingPaths: signingPaths,
+            chainContext: context,
+            keyManager: keyManager
+        )
+    }
+
     /// One Web of Trust between coin selection and signing: figure out which addresses the
     /// chosen inputs came from, then ask the ``BalanceTracker`` for their derivation paths.
     /// Throws if any input can't be resolved (paranoid; shouldn't happen in practice

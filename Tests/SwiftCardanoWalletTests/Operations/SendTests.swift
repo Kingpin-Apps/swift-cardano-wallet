@@ -216,6 +216,58 @@ struct SendTests {
         #expect(prepared.signingPaths.first?.role == .external)
     }
 
+    // MARK: - Consolidation (spend-all-to-self)
+
+    @Test func consolidationCollapsesManyUTxOsIntoOneOutput() async throws {
+        // Two funded addresses → consolidation spends both and returns a single change UTxO.
+        let (wallet, _, external, change) = try await multiAddressWallet()
+        let prepared = try await wallet.prepareConsolidation()
+
+        let body = prepared.transaction.transactionBody
+        #expect(body.inputs.count == 2)              // both UTxOs consumed
+        #expect(body.outputs.count == 1)             // collapsed to one output
+        #expect(body.outputs.first?.address == change)  // back to the wallet (change addr)
+
+        // The single output holds the combined balance minus fee (< 8 ADA, > 7 ADA).
+        let out = body.outputs.first?.amount.coin ?? 0
+        #expect(out < 8_000_000)
+        #expect(out > 7_000_000)
+
+        // One witness per contributing address (external-0 and change-0).
+        let signed = try await prepared.sign()
+        guard case .nonEmptyOrderedSet(let set) = signed.transaction.transactionWitnessSet.vkeyWitnesses else {
+            Issue.record("Expected witnesses"); return
+        }
+        #expect(set.elements.count == 2)
+        _ = external
+    }
+
+
+    @Test func consolidationHonorsSelectedInputs() async throws {
+        // Passing an explicit subset forces exactly those UTxOs (coin control).
+        let (wallet, _, external, _) = try await multiAddressWallet()
+        let utxos = try await wallet.utxos()
+        let externalUTxO = try #require(utxos.first { $0.output.address == external })
+
+        let prepared = try await wallet.prepareConsolidation(inputs: [externalUTxO])
+        let body = prepared.transaction.transactionBody
+        #expect(body.inputs.count == 1)
+        #expect(body.outputs.count == 1)
+    }
+
+    @Test func consolidatingEmptyWalletThrowsInsufficientFunds() async throws {
+        let stub = StubChainContext(networkId: NetworkId.testnet)
+        let wallet = try await MnemonicWallet(
+            mnemonic: testMnemonic, network: .preprod, provider: .custom(make: { stub })
+        )
+        do {
+            _ = try await wallet.prepareConsolidation()
+            Issue.record("Expected insufficientFunds")
+        } catch let error as WalletError {
+            if case .insufficientFunds = error {} else { Issue.record("Unexpected: \(error)") }
+        }
+    }
+
     @Test func cborRoundTripPreservesSignature() async throws {
         let (wallet, _, _) = try await wallet(withFunding: 10_000_000)
         let recipient = try await wallet.changeAddress()
