@@ -1,3 +1,9 @@
+## 1.5.0 (2026-07-09)
+
+### Feat
+
+- **send**: prepareTransaction coin control (inputs: param)
+
 ## 1.4.0 (2026-07-09)
 
 ### Feat
