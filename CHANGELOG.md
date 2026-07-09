@@ -1,3 +1,9 @@
+## 1.4.0 (2026-07-09)
+
+### Feat
+
+- **send**: add prepareTransaction composable primitive
+
 ## 1.3.0 (2026-07-08)
 
 ### Feat
