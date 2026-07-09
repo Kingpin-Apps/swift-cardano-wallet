@@ -1,3 +1,9 @@
+## 1.6.0 (2026-07-09)
+
+### Feat
+
+- **send**: add prepareConsolidation (spend-all-to-self)
+
 ## 1.5.0 (2026-07-09)
 
 ### Feat
