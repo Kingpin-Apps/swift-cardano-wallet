@@ -1,3 +1,9 @@
+## 1.7.0 (2026-07-09)
+
+### Feat
+
+- **governance**: dedicated CIP-0105 DRep keys (role 3)
+
 ## 1.6.0 (2026-07-09)
 
 ### Feat
