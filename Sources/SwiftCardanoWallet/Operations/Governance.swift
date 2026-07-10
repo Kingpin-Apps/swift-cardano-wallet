@@ -79,8 +79,9 @@ extension MnemonicWallet {
         vote: Vote,
         anchor: GovernanceAnchor? = nil
     ) async throws -> PreparedTransaction {
-        let stakeVKey = try await keyManager.stakeVerificationKey(at: account.stakePath())
-        let drepKeyHash = try stakeVKey.hash()
+        // Vote as this wallet's DRep — identified by its CIP-0105 DRep key hash.
+        let drepVKey = try await keyManager.drepVerificationKey(at: account.drepPath())
+        let drepKeyHash = try drepVKey.hash()
         let voter = Voter(credential: .drepKeyhash(drepKeyHash))
 
         let change = try await changeAddress()
@@ -128,7 +129,7 @@ extension MnemonicWallet {
             transaction: unsigned,
             signingPaths: [
                 account.paymentPath(role: .external, index: 0),
-                account.stakePath(),
+                account.drepPath(),
             ],
             chainContext: context,
             keyManager: keyManager
@@ -175,8 +176,9 @@ extension MnemonicWallet {
     }
 
     private func prepareDRepCertificate(kind: DRepCertificateKind) async throws -> PreparedTransaction {
-        let stakeVKey = try await keyManager.stakeVerificationKey(at: account.stakePath())
-        let drepKeyHash = try stakeVKey.hash()
+        // CIP-0105: the DRep credential is a dedicated DRep key (role 3), not the stake key.
+        let drepVKey = try await keyManager.drepVerificationKey(at: account.drepPath())
+        let drepKeyHash = try drepVKey.hash()
         let drepCredential = DRepCredential(credential: .verificationKeyHash(drepKeyHash))
         let feeAddress = try await receiveAddress()
 
@@ -184,7 +186,7 @@ extension MnemonicWallet {
         let utxos = try await self.utxos()
 
         let builder = TxBuilder(context: context)
-        builder.witnessOverride = 2  // payment + stake (the DRep credential)
+        builder.witnessOverride = 2  // payment + DRep key (the DRep credential)
         builder.potentialInputs = utxos
 
         // Resolve the anchor up-front so its specific error (e.g. configurationMissing) reaches
@@ -229,11 +231,19 @@ extension MnemonicWallet {
             transaction: tx,
             signingPaths: [
                 account.paymentPath(role: .external, index: 0),
-                account.stakePath(),
+                account.drepPath(),
             ],
             chainContext: context,
             keyManager: keyManager
         )
+    }
+
+    /// The wallet's own DRep id (bech32 `drep1…`), derived from its CIP-0105 DRep key. This is the
+    /// credential others delegate their vote to, and the identity used when this wallet votes.
+    public func drepID() async throws -> String {
+        let drepVKey = try await keyManager.drepVerificationKey(at: account.drepPath())
+        let drep = DRep(credential: .verificationKeyHash(try drepVKey.hash()))
+        return try drep.toBech32()
     }
 
     private static func resolveDRep(target: DRepTarget) throws -> DRep {

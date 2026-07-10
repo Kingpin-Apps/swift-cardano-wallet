@@ -50,7 +50,44 @@ struct GovernanceTests {
         #expect(prepared.signingPaths.count == 2)
         let roles = Set(prepared.signingPaths.map { $0.role })
         #expect(roles.contains(.external))
-        #expect(roles.contains(.stake))
+        // CIP-0105: the DRep credential is signed by the dedicated DRep key, not the stake key.
+        #expect(roles.contains(.drep))
+        #expect(!roles.contains(.stake))
+    }
+
+    // MARK: - CIP-0105 dedicated DRep keys
+
+    @Test func drepIDIsDerivedFromDRepKeyNotStakeKey() async throws {
+        let (wallet, _, _) = try await wallet()
+        let drepId = try await wallet.drepID()
+        #expect(drepId.hasPrefix("drep1"))
+
+        // The stake-key credential would produce a *different* drep id — prove they diverge.
+        let stakeVKey = try await wallet.keyManager.stakeVerificationKey(at: wallet.account.stakePath())
+        let stakeBasedId = try DRep(credential: .verificationKeyHash(try stakeVKey.hash())).toBech32()
+        #expect(drepId != stakeBasedId)
+
+        // The DRep key at role 3 must differ from the stake key at role 2.
+        let drepVKey = try await wallet.keyManager.drepVerificationKey(at: wallet.account.drepPath())
+        #expect(try drepVKey.hash() != stakeVKey.hash())
+    }
+
+    @Test func registerDRepSignsWithTheDRepKey() async throws {
+        // Regression: signing a `.drep`-role path used to throw ("PR 8"); it must now work.
+        let (wallet, _, _) = try await wallet()
+        let signed = try await wallet.prepareRegisterDRep().sign()
+        guard case .nonEmptyOrderedSet(let set) = signed.transaction.transactionWitnessSet.vkeyWitnesses else {
+            Issue.record("Expected witnesses"); return
+        }
+        #expect(set.elements.count == 2)  // payment + DRep key
+    }
+
+    @Test func voteSigningPathUsesTheDRepRole() async throws {
+        let (wallet, _, _) = try await wallet()
+        let prepared = try await wallet.prepareVote(on: try sampleGovActionID(), vote: .yes)
+        let roles = Set(prepared.signingPaths.map { $0.role })
+        #expect(roles.contains(.drep))
+        #expect(!roles.contains(.stake))
     }
 
     @Test func registerDRepWithAnchor() async throws {

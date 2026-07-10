@@ -199,12 +199,20 @@ public actor EncryptedKeyManager: KeyManager {
         try await inner.stakeVerificationKey(at: path)
     }
 
+    public func drepVerificationKey(at path: DerivationPath) async throws -> DRepVerificationKey {
+        try await inner.drepVerificationKey(at: path)
+    }
+
     public func paymentSigningKeyType(at path: DerivationPath) async throws -> SigningKeyType {
         try await inner.paymentSigningKeyType(at: path)
     }
 
     public func stakeSigningKeyType(at path: DerivationPath) async throws -> SigningKeyType {
         try await inner.stakeSigningKeyType(at: path)
+    }
+
+    public func drepSigningKeyType(at path: DerivationPath) async throws -> SigningKeyType {
+        try await inner.drepSigningKeyType(at: path)
     }
 
     // MARK: - Internals

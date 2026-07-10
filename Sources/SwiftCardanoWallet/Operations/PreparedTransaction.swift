@@ -50,9 +50,11 @@ public struct PreparedTransaction: Sendable {
                 skeyType = try await keyManager.paymentSigningKeyType(at: path)
             case .stake:
                 skeyType = try await keyManager.stakeSigningKeyType(at: path)
-            case .drep, .ccCold, .ccHot:
+            case .drep:
+                skeyType = try await keyManager.drepSigningKeyType(at: path)
+            case .ccCold, .ccHot:
                 throw WalletError.unsupportedOperation(
-                    "Signing for role \(path.role) is not supported until PR 8 (governance keys)"
+                    "Signing for role \(path.role) is not supported yet (committee keys)"
                 )
             }
             do {

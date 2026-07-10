@@ -25,6 +25,11 @@ public struct Account: Sendable, Equatable {
     public func stakePath(index: UInt32 = 0) -> DerivationPath {
         DerivationPath(purpose: purpose, account: self.index, role: .stake, index: index)
     }
+
+    /// CIP-0105 DRep key path (`…/account'/3/index`). The wallet's own DRep credential.
+    public func drepPath(index: UInt32 = 0) -> DerivationPath {
+        DerivationPath(purpose: purpose, account: self.index, role: .drep, index: index)
+    }
 }
 
 extension Account {

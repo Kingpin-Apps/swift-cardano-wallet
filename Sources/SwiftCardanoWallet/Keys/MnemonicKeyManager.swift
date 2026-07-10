@@ -12,6 +12,7 @@ public actor MnemonicKeyManager: KeyManager {
     private let hdWallet: HDWallet
     private var paymentSkeyCache: [DerivationPath: PaymentExtendedSigningKey] = [:]
     private var stakeSkeyCache: [DerivationPath: StakeExtendedSigningKey] = [:]
+    private var drepSkeyCache: [DerivationPath: StakeExtendedSigningKey] = [:]
 
     /// Construct from a mnemonic phrase (12 / 15 / 18 / 21 / 24 words).
     public init(mnemonic: String, passphrase: String = "") throws {
@@ -56,6 +57,18 @@ public actor MnemonicKeyManager: KeyManager {
         .extendedSigningKey(try cachedStakeSkey(at: path))
     }
 
+    public func drepVerificationKey(at path: DerivationPath) throws -> DRepVerificationKey {
+        let skey = try cachedDrepSkey(at: path)
+        let extVKey: StakeExtendedVerificationKey = try skey.toVerificationKey()
+        // Ed25519 keys are format-identical across roles; the non-extended conversion is generic
+        // over the target key type, so the same 32-byte pubkey re-types as a DRep vkey.
+        return try extVKey.toNonExtended()
+    }
+
+    public func drepSigningKeyType(at path: DerivationPath) throws -> SigningKeyType {
+        .extendedSigningKey(try cachedDrepSkey(at: path))
+    }
+
     // MARK: - Internals
 
     private func cachedPaymentSkey(at path: DerivationPath) throws -> PaymentExtendedSigningKey {
@@ -95,6 +108,26 @@ public actor MnemonicKeyManager: KeyManager {
             throw WalletError.derivationFailed("\(path): \(error)")
         }
         stakeSkeyCache[path] = derived
+        return derived
+    }
+
+    private func cachedDrepSkey(at path: DerivationPath) throws -> StakeExtendedSigningKey {
+        if let cached = drepSkeyCache[path] { return cached }
+        let derived: StakeExtendedSigningKey
+        do {
+            let child = try hdWallet.derive(fromPath: path.description)
+            let payload = child.xPrivateKey + child.publicKey + child.chainCode
+            derived = StakeExtendedSigningKey(
+                payload: payload,
+                type: StakeExtendedSigningKey.TYPE,
+                description: StakeExtendedSigningKey.DESCRIPTION
+            )
+        } catch let error as WalletError {
+            throw error
+        } catch {
+            throw WalletError.derivationFailed("\(path): \(error)")
+        }
+        drepSkeyCache[path] = derived
         return derived
     }
 }
