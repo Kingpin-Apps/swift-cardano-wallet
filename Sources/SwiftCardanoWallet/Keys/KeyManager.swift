@@ -32,19 +32,12 @@ public protocol KeyManager: Sendable {
     func paymentSigningKeyType(at path: DerivationPath) async throws -> SigningKeyType
     func stakeSigningKeyType(at path: DerivationPath) async throws -> SigningKeyType
 
-    /// DRep-key signing material at a `.drep`-role path. Default throws; HD managers override.
+    /// DRep-key signing material at a `.drep`-role path. HD managers derive it; managers without HD
+    /// material throw ``WalletError/unsupportedOperation``.
     func drepSigningKeyType(at path: DerivationPath) async throws -> SigningKeyType
 }
 
 extension KeyManager {
-    /// Default: no DRep-key support. HD managers (mnemonic / encrypted) override these.
-    public func drepVerificationKey(at path: DerivationPath) async throws -> DRepVerificationKey {
-        throw WalletError.unsupportedOperation("\(kind) wallets do not support DRep keys")
-    }
-
-    public func drepSigningKeyType(at path: DerivationPath) async throws -> SigningKeyType {
-        throw WalletError.unsupportedOperation("\(kind) wallets do not support DRep keys")
-    }
 
     /// Convenience: fetch as a typed extended signing key. Throws ``WalletError/unsupportedOperation``
     /// if the manager produces non-extended (vanilla `cardano-cli`) keys.

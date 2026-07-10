@@ -55,11 +55,19 @@ public struct WatchOnlyKeyManager: KeyManager {
         return stakeVKey
     }
 
+    public func drepVerificationKey(at path: DerivationPath) throws -> DRepVerificationKey {
+        throw WalletError.unsupportedOperation("WatchOnlyKeyManager has no DRep key (constructed from public material only).")
+    }
+
     public func paymentSigningKeyType(at path: DerivationPath) throws -> SigningKeyType {
         throw WalletError.watchOnly
     }
 
     public func stakeSigningKeyType(at path: DerivationPath) throws -> SigningKeyType {
+        throw WalletError.watchOnly
+    }
+
+    public func drepSigningKeyType(at path: DerivationPath) throws -> SigningKeyType {
         throw WalletError.watchOnly
     }
 }

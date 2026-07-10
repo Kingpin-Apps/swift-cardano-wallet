@@ -160,6 +160,14 @@ public actor TextEnvelopeKeyManager: KeyManager {
         }
     }
 
+    public func drepVerificationKey(at path: DerivationPath) throws -> DRepVerificationKey {
+        throw WalletError.unsupportedOperation("TextEnvelopeKeyManager does not derive DRep keys (import a DRep key file to add support).")
+    }
+
+    public func drepSigningKeyType(at path: DerivationPath) throws -> SigningKeyType {
+        throw WalletError.unsupportedOperation("TextEnvelopeKeyManager does not derive DRep keys (import a DRep key file to add support).")
+    }
+
     // MARK: - Parsing
 
     /// Which role a `.skey` file is expected to carry — payment or stake.
