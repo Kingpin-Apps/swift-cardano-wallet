@@ -1,3 +1,9 @@
+## 1.7.1 (2026-07-09)
+
+### Fix
+
+- **keys**: make DRep key methods explicit per-conformer (no default impl)
+
 ## 1.7.0 (2026-07-09)
 
 ### Feat
