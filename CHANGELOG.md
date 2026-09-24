@@ -1,3 +1,9 @@
+## 1.7.2 (2026-09-24)
+
+### Fix
+
+- **keys**: zeroize on musl by guarding explicit_bzero with canImport(Musl)
+
 ## 1.7.1 (2026-07-09)
 
 ### Fix
