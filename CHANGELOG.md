@@ -1,3 +1,9 @@
+## 2.0.0 (2026-10-30)
+
+### Feat
+
+- build against swift-cardano-core 0.10 with exact balances and ledger-valid CIP-25 metadata
+
 ## 1.7.2 (2026-09-24)
 
 ### Fix
