@@ -165,8 +165,8 @@ struct MultisigTests {
         // Two cosigners (indices 0 and 2) sign locally and ship partials to the coordinator.
         let p0 = try prepared.signLocal(with: cosigners[0].signingKey)
         let p2 = try prepared.signLocal(with: cosigners[2].signingKey)
-        #expect(p0.bodyHash == prepared.bodyHash)
-        #expect(p2.bodyHash == prepared.bodyHash)
+        #expect(try p0.bodyHash == prepared.bodyHash)
+        #expect(try p2.bodyHash == prepared.bodyHash)
 
         // Coordinator combines.
         let signed = try prepared.combine([p0, p2])

@@ -274,10 +274,10 @@ struct SendTests {
         let signed = try await wallet.prepareSend(lovelace: 1_500_000, to: recipient).sign()
 
         let cbor = signed.exportCBOR()
-        let parsed = Transaction(payload: cbor, type: nil, description: nil)
+        let parsed = try Transaction(payload: cbor, type: nil, description: nil)
 
         // Same body hash before and after CBOR round-trip — proves witnesses match the body.
-        #expect(parsed.transactionBody.hash() == signed.transaction.transactionBody.hash())
+        #expect(try parsed.transactionBody.hash() == signed.transaction.transactionBody.hash())
         if case .nonEmptyOrderedSet(let parsedSet) = parsed.transactionWitnessSet.vkeyWitnesses {
             #expect(parsedSet.elements.count == 1)
         } else {

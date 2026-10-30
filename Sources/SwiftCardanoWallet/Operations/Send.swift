@@ -1,3 +1,4 @@
+import BigInt
 import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
@@ -11,14 +12,14 @@ extension MnemonicWallet {
     ///   - lovelace: the amount, in lovelace, to send.
     ///   - to: destination address.
     /// - Returns: a ``PreparedTransaction`` that can be signed and submitted (or exported).
-    public func prepareSend(lovelace: Int64, to address: Address) async throws -> PreparedTransaction {
+    public func prepareSend(lovelace: UInt64, to address: Address) async throws -> PreparedTransaction {
         let change = try await changeAddress()
 
         let context = chainContextHandle()
         let utxoList = try await utxos()
 
         guard !utxoList.isEmpty else {
-            throw WalletError.insufficientFunds(required: UInt64(lovelace), available: 0)
+            throw WalletError.insufficientFunds(required: lovelace, available: 0)
         }
 
         // Fee estimation needs a witness count *before* coin selection runs, but we won't
@@ -47,11 +48,11 @@ extension MnemonicWallet {
             body = try await builder.build(changeAddress: change)
         } catch {
             // surface insufficient-funds the way callers expect
-            let total = utxoList.reduce(0) { $0 + $1.output.amount.coin }
-            if total < lovelace {
+            let total = utxoList.reduce(BigInt(0)) { $0 + $1.output.amount.coin }
+            if total < BigInt(lovelace) {
                 throw WalletError.insufficientFunds(
-                    required: UInt64(lovelace),
-                    available: UInt64(max(0, total))
+                    required: lovelace,
+                    available: UInt64(clamping: total)
                 )
             }
             throw WalletError.wrappingValidation(error)
@@ -133,10 +134,11 @@ extension MnemonicWallet {
         do {
             body = try await builder.build(changeAddress: change)
         } catch {
-            let total = sources.reduce(0) { $0 + $1.output.amount.coin }
-            let required = outputs.reduce(Int64(0)) { $0 + $1.amount.coin }
+            let total = sources.reduce(BigInt(0)) { $0 + $1.output.amount.coin }
+            let required = outputs.reduce(BigInt(0)) { $0 + $1.amount.coin }
             if total < required {
-                throw WalletError.insufficientFunds(required: UInt64(required), available: UInt64(max(0, total)))
+                throw WalletError.insufficientFunds(
+                    required: UInt64(clamping: required), available: UInt64(clamping: total))
             }
             throw WalletError.wrappingValidation(error)
         }
@@ -273,7 +275,7 @@ extension MnemonicWallet {
 
     /// One-shot: build, sign, submit. Returns the transaction id reported by the chain backend.
     @discardableResult
-    public func send(lovelace: Int64, to address: Address) async throws -> String {
+    public func send(lovelace: UInt64, to address: Address) async throws -> String {
         let prepared = try await prepareSend(lovelace: lovelace, to: address)
         let signed = try await prepared.sign()
         return try await signed.submit()

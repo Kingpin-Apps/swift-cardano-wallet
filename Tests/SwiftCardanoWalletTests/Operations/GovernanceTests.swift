@@ -208,7 +208,7 @@ struct GovernanceTests {
         let actionId = try sampleGovActionID()
         let yes = try await wallet.prepareVote(on: actionId, vote: .yes)
         let abstain = try await wallet.prepareVote(on: actionId, vote: .abstain)
-        #expect(yes.transaction.transactionBody.hash() != abstain.transaction.transactionBody.hash())
+        #expect(try yes.transaction.transactionBody.hash() != abstain.transaction.transactionBody.hash())
     }
 
     @Test func voteWithAnchorIncludesAnchorBytes() async throws {

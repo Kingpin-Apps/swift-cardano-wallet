@@ -198,7 +198,7 @@ extension MnemonicWallet {
             throw WalletError.wrappingValidation(error)
         }
 
-        let cip25 = metadata.encode(policyId: policyId, assetName: name)
+        let cip25 = try metadata.encode(policyId: policyId, assetName: name)
         let metaMap: [TransactionMetadatumLabel: TransactionMetadatum] = [
             CIP25_METADATA_LABEL: cip25
         ]

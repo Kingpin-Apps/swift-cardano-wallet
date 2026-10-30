@@ -16,6 +16,8 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
     private let stakeInfoByAddress: [String: [StakeAddressInfo]]
     private let _protocolParameters: ProtocolParameters
     private(set) var submittedCBOR: [Data] = []
+    /// When set, ``stakeAddressInfo(address:)`` throws it, as a failing backend would.
+    var stakeAddressInfoError: (any Error)?
 
     init(
         networkId: NetworkId = .testnet,
@@ -46,7 +48,7 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
 
     func genesisParameters() async throws -> GenesisParameters {
         GenesisParameters(
-            activeSlotsCoefficient: 0.05,
+            activeSlotsCoefficient: UnitInterval(numerator: 1, denominator: 20),
             epochLength: 432_000,
             maxKesEvolutions: 62,
             maxLovelaceSupply: 45_000_000_000_000_000,
@@ -89,6 +91,7 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
     }
 
     func stakeAddressInfo(address: Address) async throws -> [StakeAddressInfo] {
+        if let stakeAddressInfoError { throw stakeAddressInfoError }
         let key = (try? address.toBech32()) ?? address.description
         return stakeInfoByAddress[key] ?? []
     }

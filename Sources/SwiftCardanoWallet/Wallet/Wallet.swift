@@ -1,3 +1,4 @@
+import BigInt
 import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
@@ -213,7 +214,7 @@ public enum Wallet: Sendable {
     ///   Extract the concrete wallet via ``multisigWallet`` / ``hardwareWallet`` and use
     ///   its `prepareSend(...)` + signing flow.
     @discardableResult
-    public func send(lovelace: Int64, to address: Address) async throws -> String {
+    public func send(lovelace: UInt64, to address: Address) async throws -> String {
         switch self {
         case .mnemonic(let w):
             return try await w.send(lovelace: lovelace, to: address)
@@ -238,7 +239,7 @@ public enum Wallet: Sendable {
     /// ``MnemonicWallet/sendTo(handle:lovelace:)`` for mnemonic wallets; throws for
     /// the other kinds.
     @discardableResult
-    public func sendTo(handle: String, lovelace: Int64) async throws -> String {
+    public func sendTo(handle: String, lovelace: UInt64) async throws -> String {
         switch self {
         case .mnemonic(let w):
             return try await w.sendTo(handle: handle, lovelace: lovelace)

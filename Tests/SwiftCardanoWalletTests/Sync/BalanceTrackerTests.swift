@@ -59,6 +59,22 @@ struct BalanceTrackerTests {
         #expect(balance.rewards == 0)
     }
 
+    @Test("Rewards a failing backend could not read are unknown, not zero")
+    func rewardsUnknownWhenTheLookupFails() async throws {
+        let network = Network.preprod
+        let stub = StubChainContext(networkId: network.networkId, utxos: [:])
+        stub.stakeAddressInfoError = URLError(.timedOut)
+        let wallet = try await MnemonicWallet(
+            mnemonic: testMnemonic,
+            network: network,
+            provider: .custom(make: { stub }),
+            gapLimit: 1
+        )
+        let balance = try await wallet.balance()
+        #expect(balance.rewards == nil)
+        #expect(balance.lovelace == 0)
+    }
+
     @Test func sweepCoversBothRoles() async throws {
         let network = Network.preprod
         let derived = try await deriveAddresses(

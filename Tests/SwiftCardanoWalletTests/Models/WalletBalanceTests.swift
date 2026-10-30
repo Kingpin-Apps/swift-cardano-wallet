@@ -29,7 +29,8 @@ struct WalletBalanceTests {
     @Test func defaultMultiAssetIsEmpty() {
         let b = WalletBalance(lovelace: 100, utxoCount: 1)
         #expect(b.multiAsset == MultiAsset([:]))
-        #expect(b.rewards == 0)
+        // Rewards not read are unknown, not zero.
+        #expect(b.rewards == nil)
     }
 
     @Test func canCarryMultiAsset() {

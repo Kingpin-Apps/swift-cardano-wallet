@@ -27,16 +27,17 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.5.0"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-core.git", from: "0.5.0"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-chain.git", from: "0.7.0"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git", from: "1.0.3"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txvalidator.git", from: "0.2.2"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-utils.git", from: "0.5.5"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.3.3"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-core.git", from: "0.10.0"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-chain.git", from: "0.14.0"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git", from: "2.0.0"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txvalidator.git", from: "0.6.0"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-utils.git", from: "0.5.10"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.4.1"),
         .package(url: "https://github.com/Kingpin-Apps/swift-handles-api.git", from: "0.1.1"),
         .package(url: "https://github.com/Kingpin-Apps/swift-mnemonic.git", from: "0.2.5"),
         // SQLite backend for SQLiteUTxOStore. Only linked when the `SQLite` package trait is enabled.
         .package(url: "https://github.com/stephencelis/SQLite.swift.git", from: "0.15.3"),
+        .package(url: "https://github.com/attaswift/BigInt.git", "5.7.0"..<"7.0.0"),
     ],
     targets: [
         .target(
@@ -53,6 +54,7 @@ let package = Package(
                 .product(name: "SwiftHandlesAPI", package: "swift-handles-api"),
                 .product(name: "SwiftMnemonic", package: "swift-mnemonic"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                "BigInt",
                 .product(name: "SQLite", package: "SQLite.swift", condition: .when(traits: ["SQLite"])),
             ],
             swiftSettings: [
@@ -62,7 +64,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SwiftCardanoWalletTests",
-            dependencies: ["SwiftCardanoWallet"],
+            dependencies: ["SwiftCardanoWallet", "BigInt"],
             resources: [
                 .copy("data"),
             ],

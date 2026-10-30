@@ -41,7 +41,7 @@ public struct PreparedTransaction: Sendable {
         // node would reject duplicate witnesses, and any caller passing repeated paths is
         // almost certainly buggy — silently collapsing them is the safer recovery.
         var byKeyHash: [Data: VerificationKeyWitness] = [:]
-        let bodyHash = transaction.transactionBody.hash()
+        let bodyHash = try transaction.transactionBody.hash()
 
         for path in signingPaths {
             let skeyType: SigningKeyType

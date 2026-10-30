@@ -33,20 +33,20 @@ public struct PreparedMultisigTransaction: Sendable {
 
     /// CBOR encoding of the (still-unsigned) transaction. Persistable to disk for distribution
     /// to cosigners.
-    public func exportCBOR() -> Data {
+    public func exportCBOR() throws -> Data {
         transaction.payload
     }
 
     /// 32-byte blake2b-256 hash of the transaction body. Cosigners sign this verbatim; the
     /// combiner uses it to detect mismatched partials.
     public var bodyHash: Data {
-        transaction.transactionBody.hash()
+        get throws { try transaction.transactionBody.hash() }
     }
 
     /// Sign the body with one cosigner's signing key locally and produce a
     /// ``PartialWitness`` ready to ship back to the coordinator.
     public func signLocal(with key: SigningKeyType) throws -> PartialWitness {
-        let hash = bodyHash
+        let hash = try bodyHash
         do {
             let signature = try key.sign(data: hash)
             let vkey = try key.toVerificationKeyType()
@@ -67,7 +67,7 @@ public struct PreparedMultisigTransaction: Sendable {
     ///   We could, but it's an extra dep cycle through CryptoKit and the failure mode (rejected
     ///   submit) is the same.
     public func combine(_ partials: [PartialWitness]) throws -> SignedTransaction {
-        let expectedHash = bodyHash
+        let expectedHash = try bodyHash
 
         // Reject anything signing the wrong body.
         for partial in partials where partial.bodyHash != expectedHash {

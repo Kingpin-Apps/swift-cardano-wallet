@@ -163,13 +163,7 @@ struct PlutusMintTests {
         )
         // The supplied collateral UTxO's transaction input should appear in the body's
         // collateral set.
-        let bodyCollateral: Set<TransactionInput>
-        switch prepared.transaction.transactionBody.collateral {
-        case .list(let arr): bodyCollateral = Set(arr)
-        case .nonEmptyOrderedSet(let set): bodyCollateral = set.elements
-        case .indefiniteList(let il): bodyCollateral = Set(il.map { $0 })
-        case .none: bodyCollateral = []
-        }
+        let bodyCollateral = Set(prepared.transaction.transactionBody.collateral?.asList ?? [])
         #expect(bodyCollateral.contains(explicitCollateral.input))
     }
 

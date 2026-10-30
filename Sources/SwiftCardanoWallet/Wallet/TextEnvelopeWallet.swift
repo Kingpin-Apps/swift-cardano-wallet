@@ -1,3 +1,4 @@
+import BigInt
 import Foundation
 import SwiftCardanoCore
 import SwiftCardanoChain
@@ -129,17 +130,7 @@ public actor TextEnvelopeWallet: WalletProtocol {
 
     public func balance() async throws -> WalletBalance {
         let allUtxos = try await utxos()
-        let lovelace = allUtxos.reduce(0) { $0 + $1.output.amount.coin }
-        var assets = MultiAsset([:])
-        for u in allUtxos {
-            assets += u.output.amount.multiAsset
-        }
-        return WalletBalance(
-            lovelace: lovelace,
-            multiAsset: assets,
-            rewards: 0,
-            utxoCount: allUtxos.count
-        )
+        return try WalletBalance.of(allUtxos)
     }
 
     public nonisolated func chainContextHandle() -> any ChainContext { chainContext }
@@ -147,10 +138,10 @@ public actor TextEnvelopeWallet: WalletProtocol {
     // MARK: - Send
 
     /// Build an unsigned send transaction.
-    public func prepareSend(lovelace: Int64, to address: Address) async throws -> PreparedTransaction {
+    public func prepareSend(lovelace: UInt64, to address: Address) async throws -> PreparedTransaction {
         let utxoList = try await utxos()
         guard !utxoList.isEmpty else {
-            throw WalletError.insufficientFunds(required: UInt64(lovelace), available: 0)
+            throw WalletError.insufficientFunds(required: lovelace, available: 0)
         }
 
         let context = chainContext
@@ -166,11 +157,11 @@ public actor TextEnvelopeWallet: WalletProtocol {
         do {
             body = try await builder.build(changeAddress: _address)
         } catch {
-            let total = utxoList.reduce(0) { $0 + $1.output.amount.coin }
-            if total < lovelace {
+            let total = utxoList.reduce(BigInt(0)) { $0 + $1.output.amount.coin }
+            if total < BigInt(lovelace) {
                 throw WalletError.insufficientFunds(
-                    required: UInt64(lovelace),
-                    available: UInt64(max(0, total))
+                    required: lovelace,
+                    available: UInt64(clamping: total)
                 )
             }
             throw WalletError.wrappingValidation(error)
@@ -199,7 +190,7 @@ public actor TextEnvelopeWallet: WalletProtocol {
 
     /// One-shot: build, sign, submit.
     @discardableResult
-    public func send(lovelace: Int64, to address: Address) async throws -> String {
+    public func send(lovelace: UInt64, to address: Address) async throws -> String {
         let prepared = try await prepareSend(lovelace: lovelace, to: address)
         let signed = try await prepared.sign()
         return try await signed.submit()

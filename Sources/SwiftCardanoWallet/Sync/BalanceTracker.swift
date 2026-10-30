@@ -91,28 +91,27 @@ public actor BalanceTracker {
     /// Aggregate balance: lovelace, multi-asset, rewards (from `stakeAddressInfo`), UTxO count.
     public func balance() async throws -> WalletBalance {
         let utxos = try await self.utxos()
-        let lovelace = utxos.reduce(0) { $0 + $1.output.amount.coin }
-        var assets = MultiAsset([:])
-        for u in utxos {
-            assets += u.output.amount.multiAsset
-        }
 
         let rewardAddr = try await account.rewardAddress(with: keyManager)
-        let rewards: Int64
+        let rewards: UInt64?
         do {
             let info = try await chainContext.stakeAddressInfo(address: rewardAddr)
-            rewards = info.first?.rewardAccountBalance ?? 0
+            // No entry: the stake address is not registered, so it holds none.
+            rewards = try info.first.map { info in
+                guard let balance = UInt64(exactly: info.rewardAccountBalance) else {
+                    throw WalletError.providerError("Reward balance \(info.rewardAccountBalance) is negative")
+                }
+                return balance
+            } ?? 0
+        } catch let error as WalletError {
+            throw error
         } catch {
-            // Stake address not registered (or backend doesn't support the call) — report 0.
-            rewards = 0
+            // The backend failed, or doesn't support the call: the rewards are unknown,
+            // which is not the same as none.
+            rewards = nil
         }
 
-        return WalletBalance(
-            lovelace: lovelace,
-            multiAsset: assets,
-            rewards: rewards,
-            utxoCount: utxos.count
-        )
+        return try WalletBalance.of(utxos, rewards: rewards)
     }
 
     // MARK: - Path resolution

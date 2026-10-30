@@ -250,7 +250,7 @@ struct HardwareWalletTests {
 
         // Simulate the device: sign the body hash with the payment software key, persist as
         // a `.witness` TextEnvelope. (Real cardano-hw-cli would do the same shape.)
-        let bodyHash = prepared.transaction.transactionBody.hash()
+        let bodyHash = try prepared.transaction.transactionBody.hash()
         let paymentSkey = try await km.paymentSigningKeyType(at: account.paymentPath())
         let paymentSig = try paymentSkey.sign(data: bodyHash)
         let paymentWitness = VerificationKeyWitness(

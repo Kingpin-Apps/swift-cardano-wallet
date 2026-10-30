@@ -49,12 +49,7 @@ struct CIP30Tests {
     /// Count vkey witnesses across every shape the encoder can emit
     /// (`.list`, `.nonEmptyOrderedSet`, `.indefiniteList`, or absent).
     private func witnessCount(_ set: TransactionWitnessSet) -> Int {
-        switch set.vkeyWitnesses {
-        case .none: return 0
-        case .some(.list(let xs)): return xs.count
-        case .some(.nonEmptyOrderedSet(let s)): return s.elements.count
-        case .some(.indefiniteList(let xs)): return xs.count
-        }
+        set.vkeyWitnesses?.asList.count ?? 0
     }
 
     @Test func networkIdMatchesNetwork() async throws {
@@ -351,8 +346,8 @@ struct CIP30Tests {
         #expect(signTxCalls[0].partialSign == true)
         #expect(signTxCalls[0].originIsNil)
         // Body matches what we built (round-trip via CBOR).
-        let recordedBodyHash = signTxCalls[0].tx.transactionBody.hash()
-        let expectedBodyHash = prepared.transaction.transactionBody.hash()
+        let recordedBodyHash = try signTxCalls[0].tx.transactionBody.hash()
+        let expectedBodyHash = try prepared.transaction.transactionBody.hash()
         #expect(recordedBodyHash == expectedBodyHash)
 
         // Drive signData — approver fires with the parsed Address and raw payload bytes.

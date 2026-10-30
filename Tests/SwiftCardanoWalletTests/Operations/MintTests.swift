@@ -230,7 +230,7 @@ struct MintTests {
         let policyHex = String(repeating: "ab", count: 28)
         let policyId = ScriptHash(payload: Data(hex: policyHex))
         let metadata = CIP25NFTMetadata(name: "MyNFT", image: "ipfs://x", description: "y")
-        let encoded = metadata.encode(policyId: policyId, assetName: "MyNFT")
+        let encoded = try metadata.encode(policyId: policyId, assetName: "MyNFT")
         guard case .map(let top) = encoded else {
             Issue.record("Expected top-level map")
             return

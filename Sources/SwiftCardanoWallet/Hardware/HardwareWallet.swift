@@ -1,3 +1,4 @@
+import BigInt
 #if HARDWARE // hardware-wallet path (cardano-hw-cli via SwiftCardanoUtils) — macOS/Linux, trait-gated
 import Foundation
 import SwiftCardanoCore
@@ -179,17 +180,7 @@ public actor HardwareWallet {
     /// Aggregate balance at the wallet's address.
     public func balance() async throws -> WalletBalance {
         let allUtxos = try await utxos()
-        let lovelace = allUtxos.reduce(0) { $0 + $1.output.amount.coin }
-        var assets = MultiAsset([:])
-        for u in allUtxos {
-            assets += u.output.amount.multiAsset
-        }
-        return WalletBalance(
-            lovelace: lovelace,
-            multiAsset: assets,
-            rewards: 0,
-            utxoCount: allUtxos.count
-        )
+        return try WalletBalance.of(allUtxos)
     }
 
     /// Build (but do not sign) a transaction. Witness count is auto-set to match the
@@ -199,12 +190,12 @@ public actor HardwareWallet {
     /// action; for plain `prepareSend` we override to 1 and let coin selection account for
     /// fees on the lighter side).
     public func prepareSend(
-        lovelace: Int64,
+        lovelace: UInt64,
         to address: Address
     ) async throws -> PreparedHardwareTransaction {
         let utxoList = try await utxos()
         guard !utxoList.isEmpty else {
-            throw WalletError.insufficientFunds(required: UInt64(lovelace), available: 0)
+            throw WalletError.insufficientFunds(required: lovelace, available: 0)
         }
 
         let context = chainContext
@@ -220,11 +211,11 @@ public actor HardwareWallet {
         do {
             body = try await builder.build(changeAddress: _address)
         } catch {
-            let total = utxoList.reduce(0) { $0 + $1.output.amount.coin }
-            if total < lovelace {
+            let total = utxoList.reduce(BigInt(0)) { $0 + $1.output.amount.coin }
+            if total < BigInt(lovelace) {
                 throw WalletError.insufficientFunds(
-                    required: UInt64(lovelace),
-                    available: UInt64(max(0, total))
+                    required: lovelace,
+                    available: UInt64(clamping: total)
                 )
             }
             throw WalletError.wrappingValidation(error)

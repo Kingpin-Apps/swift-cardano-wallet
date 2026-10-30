@@ -22,7 +22,7 @@ struct CIP25v2Tests {
 
     @Test func v1EncodingKeysAssetNameAsText() throws {
         let metadata = sampleMetadata()
-        let encoded = metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v1)
+        let encoded = try metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v1)
 
         guard case .map(let outer) = encoded else {
             Issue.record("Expected outer map"); return
@@ -46,7 +46,7 @@ struct CIP25v2Tests {
 
     @Test func v2EncodingKeysAssetNameAsBytes() throws {
         let metadata = sampleMetadata()
-        let encoded = metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v2)
+        let encoded = try metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v2)
 
         guard case .map(let outer) = encoded else {
             Issue.record("Expected outer map"); return
@@ -70,7 +70,7 @@ struct CIP25v2Tests {
     @Test func v2DefaultIsV1ForBackwardsCompatibility() throws {
         let metadata = sampleMetadata()
         // No `version:` argument → v1.
-        let encoded = metadata.encode(policyId: try policyId(), assetName: "MyNFT")
+        let encoded = try metadata.encode(policyId: try policyId(), assetName: "MyNFT")
         guard case .map(let outer) = encoded else {
             Issue.record("Expected outer map"); return
         }
@@ -84,7 +84,7 @@ struct CIP25v2Tests {
         // CIP-67-style prefixed asset name (4 bytes prefix + 28 bytes data).
         let assetNameBytes = Data([0x00, 0x06, 0x43, 0xb0]) + Data(repeating: 0x42, count: 28)
         let metadata = sampleMetadata()
-        let encoded = metadata.encode(policyId: try policyId(), assetNameBytes: assetNameBytes)
+        let encoded = try metadata.encode(policyId: try policyId(), assetNameBytes: assetNameBytes)
 
         guard case .map(let outer) = encoded else {
             Issue.record("Expected outer map"); return
@@ -107,7 +107,7 @@ struct CIP25v2Tests {
         // key (some explorers / wallets choke on that).
         let name = "🦄💎"
         let metadata = sampleMetadata()
-        let encoded = metadata.encode(policyId: try policyId(), assetName: name, version: .v2)
+        let encoded = try metadata.encode(policyId: try policyId(), assetName: name, version: .v2)
 
         guard case .map(let outer) = encoded else {
             Issue.record("Expected outer map"); return
@@ -122,8 +122,42 @@ struct CIP25v2Tests {
 
     @Test func v1AndV2HaveDifferentCBORShape() throws {
         let metadata = sampleMetadata()
-        let v1 = metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v1)
-        let v2 = metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v2)
+        let v1 = try metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v1)
+        let v2 = try metadata.encode(policyId: try policyId(), assetName: "MyNFT", version: .v2)
         #expect(v1 != v2)
+    }
+}
+
+@Suite("CIP-25 metadata string limits")
+struct CIP25StringLimitTests {
+    private let policy = ScriptHash(payload: Data(repeating: 0xab, count: 28))
+
+    @Test("A string longer than 64 bytes is written as CIP-25's array of chunks")
+    func longStringsAreChunked() throws {
+        let image = "https://example.com/" + String(repeating: "é", count: 70)
+        let metadata = CIP25NFTMetadata(name: "MyNFT", image: image, description: String(repeating: "d", count: 64))
+        guard case .map(let outer) = try metadata.encode(policyId: policy, assetName: "MyNFT"),
+              case .map(let policyMap) = outer[.text(String(repeating: "ab", count: 28))],
+              case .map(let asset) = policyMap[.text("MyNFT")],
+              case .list(let chunks) = asset[.text("image")]
+        else {
+            Issue.record("Expected the image as a list of chunks"); return
+        }
+        let texts = chunks.compactMap { chunk -> String? in
+            if case .text(let text) = chunk { return text } else { return nil }
+        }
+        #expect(texts.count == chunks.count)
+        #expect(texts.allSatisfy { $0.utf8.count <= 64 })
+        #expect(texts.joined() == image)
+        // Exactly 64 bytes still fits one string.
+        #expect(asset[.text("description")] == .text(String(repeating: "d", count: 64)))
+    }
+
+    @Test("A name CIP-25 keeps as one string throws when longer than 64 bytes")
+    func longNameThrows() {
+        let metadata = CIP25NFTMetadata(name: String(repeating: "n", count: 65), image: "ipfs://abc")
+        #expect(throws: WalletError.self) {
+            try metadata.encode(policyId: policy, assetName: "MyNFT")
+        }
     }
 }
