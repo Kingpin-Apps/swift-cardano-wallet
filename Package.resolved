@@ -20,15 +20,6 @@
       }
     },
     {
-      "identity" : "command",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tuist/Command.git",
-      "state" : {
-        "revision" : "a1be621b314df169c89ee26a5c0deb380c155ccb",
-        "version" : "0.14.14"
-      }
-    },
-    {
       "identity" : "cryptoswift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/krzyzanowskim/CryptoSwift.git",
@@ -47,12 +38,30 @@
       }
     },
     {
-      "identity" : "mockable",
+      "identity" : "grpc-swift-2",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Kolos65/Mockable",
+      "location" : "https://github.com/grpc/grpc-swift-2.git",
       "state" : {
-        "revision" : "0b239389c5fa6666fb30dc97fbb23fc3ca851a85",
-        "version" : "0.6.4"
+        "revision" : "e31eb485c4575e0dbed3d1925e24084f755ac6e8",
+        "version" : "2.4.4"
+      }
+    },
+    {
+      "identity" : "grpc-swift-nio-transport",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/grpc/grpc-swift-nio-transport.git",
+      "state" : {
+        "revision" : "71c5da80432b10e87778928b309808fa89ad1911",
+        "version" : "2.12.0"
+      }
+    },
+    {
+      "identity" : "grpc-swift-protobuf",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/grpc/grpc-swift-protobuf.git",
+      "state" : {
+        "revision" : "83f5cdb2f8b4c7b57ed9419c6f4f6380b683500e",
+        "version" : "2.5.0"
       }
     },
     {
@@ -62,24 +71,6 @@
       "state" : {
         "revision" : "5b72eb9a6b23b1fec439d9a0bf38f115400421f9",
         "version" : "6.4.0"
-      }
-    },
-    {
-      "identity" : "path",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tuist/Path",
-      "state" : {
-        "revision" : "7c74ac435e03a927c3a73134c48b61e60221abcb",
-        "version" : "0.3.8"
-      }
-    },
-    {
-      "identity" : "sqlite.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/stephencelis/SQLite.swift.git",
-      "state" : {
-        "revision" : "4114679379eeb4538638f49ec14e1854dd9cf73c",
-        "version" : "0.17.0"
       }
     },
     {
@@ -159,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-chain.git",
       "state" : {
-        "revision" : "39a228d62c20278dfda5b27d98c709a07f00f81f",
-        "version" : "0.14.0"
+        "revision" : "d32a1f254b79940ae4fd3b931483f9b673088407",
+        "version" : "0.16.1"
       }
     },
     {
@@ -218,15 +209,6 @@
       }
     },
     {
-      "identity" : "swift-cardano-utils",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Kingpin-Apps/swift-cardano-utils.git",
-      "state" : {
-        "revision" : "c0186b058830f46bf2826d9fdae8f4d75f07aeaf",
-        "version" : "0.5.10"
-      }
-    },
-    {
       "identity" : "swift-cbor-codable",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cbor-codable.git",
@@ -251,24 +233,6 @@
       "state" : {
         "revision" : "f96b909e1a9e469620bc5037c1e24e00153f376f",
         "version" : "1.7.5"
-      }
-    },
-    {
-      "identity" : "swift-configuration",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-configuration",
-      "state" : {
-        "revision" : "5aa8bdb1ddd11de51cb30b0ba575f4b05a9a169d",
-        "version" : "1.4.0"
-      }
-    },
-    {
-      "identity" : "swift-configuration-toml",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mattt/swift-configuration-toml.git",
-      "state" : {
-        "revision" : "4ea16b4dfa4b023cecae5ae0368402c4d846d613",
-        "version" : "2.0.0"
       }
     },
     {
@@ -474,8 +438,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-ogmios.git",
       "state" : {
-        "revision" : "8edbf544a35950ad193a41c3708f165c24b57a06",
-        "version" : "0.4.0"
+        "revision" : "972979b0c89111fcff88d75617b8e60fc6516cd9",
+        "version" : "0.4.2"
       }
     },
     {
@@ -506,6 +470,15 @@
       }
     },
     {
+      "identity" : "swift-protobuf",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-protobuf.git",
+      "state" : {
+        "revision" : "3d537cb81aef272a03cb3be815439e9bf0eb3bd3",
+        "version" : "1.39.0"
+      }
+    },
+    {
       "identity" : "swift-rdf-canonize",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-rdf-canonize.git",
@@ -533,15 +506,6 @@
       }
     },
     {
-      "identity" : "swift-syntax",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-syntax.git",
-      "state" : {
-        "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
-        "version" : "603.0.2"
-      }
-    },
-    {
       "identity" : "swift-system",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
@@ -551,12 +515,12 @@
       }
     },
     {
-      "identity" : "swift-toml",
+      "identity" : "swift-utxorpc",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/mattt/swift-toml.git",
+      "location" : "https://github.com/Kingpin-Apps/swift-utxorpc.git",
       "state" : {
-        "revision" : "8227201d741c82183c9b0531a7d9ec7fa9240a2f",
-        "version" : "2.1.0"
+        "revision" : "7e6bdb7c1d28371ef9393d277371dddc2dee006b",
+        "version" : "0.1.0"
       }
     },
     {
@@ -584,15 +548,6 @@
       "state" : {
         "revision" : "90bbbdab3ede12c803cfbe91646f291c092517a3",
         "version" : "2.16.2"
-      }
-    },
-    {
-      "identity" : "xctest-dynamic-overlay",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pointfreeco/xctest-dynamic-overlay",
-      "state" : {
-        "revision" : "dfd70507def84cb5fb821278448a262c6ff2bbad",
-        "version" : "1.9.0"
       }
     },
     {
