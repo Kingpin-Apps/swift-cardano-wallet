@@ -1,3 +1,9 @@
+## 2.0.2 (2026-11-06)
+
+### Fix
+
+- correct the Hardware trait description
+
 ## 2.0.1 (2026-11-06)
 
 ## 2.0.0 (2026-10-30)
