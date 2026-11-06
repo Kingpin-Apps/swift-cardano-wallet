@@ -1,5 +1,5 @@
 {
-  "originHash" : "6e28c5ebc177b48e166b53b9d61ca974f60ba7856b4f9c891b79b78513fee4e5",
+  "originHash" : "4bcbe71229b41a7ab74cd79a4c04d6b163bbe6c721262571f6d18f578248196c",
   "pins" : [
     {
       "identity" : "base32",
@@ -96,8 +96,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-asn1.git",
       "state" : {
-        "revision" : "3b6410f7dee09eb33cdd26260c5fd47fda19b0e2",
-        "version" : "1.7.3"
+        "revision" : "917b472dbe53ba699cbb0495f9a95a084bc6364d",
+        "version" : "1.7.4"
       }
     },
     {
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-chain.git",
       "state" : {
-        "revision" : "d32a1f254b79940ae4fd3b931483f9b673088407",
-        "version" : "0.16.1"
+        "revision" : "aeb00e12a86f8e54d992832b0be9d10513a093b9",
+        "version" : "0.16.2"
       }
     },
     {
@@ -159,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-cips.git",
       "state" : {
-        "revision" : "eeb99767cc8ca3a7ea185697d228a38a99a6124e",
-        "version" : "0.4.1"
+        "revision" : "8cfcbe2c2f1e0c335dc831420b35e68096bb1f7b",
+        "version" : "0.4.2"
       }
     },
     {
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-core.git",
       "state" : {
-        "revision" : "d87009d79f50db04058d33f5d2dae49835f66248",
-        "version" : "0.10.0"
+        "revision" : "1ad20e350f83f3bc6bb7c4e90e1966e554a433c3",
+        "version" : "0.10.2"
       }
     },
     {
@@ -177,8 +177,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-network.git",
       "state" : {
-        "revision" : "4f268a87e443f3ba415b8f2377cd6f480bc51abb",
-        "version" : "1.3.0"
+        "revision" : "9ef00bc08b999d0e2921c6b4fd4a877c68f7cc8d",
+        "version" : "1.3.1"
       }
     },
     {
@@ -186,8 +186,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git",
       "state" : {
-        "revision" : "92db1b59639e8e98001b931fc2404e33c2e92528",
-        "version" : "2.0.0"
+        "revision" : "add9e38f98d44f76dce2cc60c394f68d8a74ab5a",
+        "version" : "2.0.1"
       }
     },
     {
@@ -195,8 +195,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-txvalidator.git",
       "state" : {
-        "revision" : "15f4fcce4fb735ce4fbbfc0895418c2d887b8350",
-        "version" : "0.6.0"
+        "revision" : "2b6f9f90a3fa01453fe18b4c325738921857d009",
+        "version" : "0.6.2"
       }
     },
     {
@@ -204,8 +204,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-uplc.git",
       "state" : {
-        "revision" : "67ec0a9d7566d111730c7354df2f7b66224b2146",
-        "version" : "0.8.1"
+        "revision" : "739acb58bccc1bfa14aa2cfe6d80316de27f9486",
+        "version" : "0.8.2"
       }
     },
     {
@@ -240,8 +240,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cose.git",
       "state" : {
-        "revision" : "e85535e86aae58323c5e11c771fe925033a4857c",
-        "version" : "1.3.3"
+        "revision" : "0d0d9df0969c8681565d9a21336c14a166d101c0",
+        "version" : "2.0.1"
       }
     },
     {
@@ -258,8 +258,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-curve448.git",
       "state" : {
-        "revision" : "5a52eaa8810acf8e3181c2af0ba29fd1112a43f5",
-        "version" : "0.3.1"
+        "revision" : "2d254889be574b9041f3f3bf06e37af1be0e36d2",
+        "version" : "0.3.3"
       }
     },
     {
@@ -321,8 +321,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-kes.git",
       "state" : {
-        "revision" : "c79b68762e420d181a9144c6b77c9b24d9bb33e3",
-        "version" : "1.0.2"
+        "revision" : "fefaa18a5351ef85fc911a8c9bde75e5d6e86869",
+        "version" : "1.0.3"
       }
     },
     {
@@ -339,8 +339,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-kupo.git",
       "state" : {
-        "revision" : "bf0c747fbd38dc17fc515bb177187bc0e041afcf",
-        "version" : "0.2.0"
+        "revision" : "04a9d3db39d97d43e2819a96f10e0f2880474277",
+        "version" : "0.2.1"
       }
     },
     {
@@ -348,8 +348,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "c9c6bb9d275ec0d95c3ad16391f3f045dc623104",
-        "version" : "1.16.2"
+        "revision" : "e3da04078777e6a1b72ce19981fbd6539b0847d8",
+        "version" : "1.17.0"
       }
     },
     {
@@ -366,8 +366,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-mnemonic.git",
       "state" : {
-        "revision" : "7345f86daa9277b0510aaed9c5fd2fce5d41e89b",
-        "version" : "0.2.6"
+        "revision" : "97ac7a4a2dc7ef329fe0fb8d6e3e3400fedafbc4",
+        "version" : "0.2.7"
       }
     },
     {
@@ -375,17 +375,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-nacl.git",
       "state" : {
-        "revision" : "03f8a9e2a7626fdc56f100da78f101fe05002298",
-        "version" : "1.0.3"
+        "revision" : "32aac9e9f00f362a359b198bc76eae4fa95f329f",
+        "version" : "1.1.0"
       }
     },
     {
       "identity" : "swift-nio",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-nio",
+      "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "6db9d9abd92ad7399b8a564cafbb87d3507245fa",
-        "version" : "2.104.0"
+        "revision" : "2f58d8ef84438d6517fc78bcea2f8527e3c72936",
+        "version" : "2.105.0"
       }
     },
     {
@@ -411,8 +411,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-ssl",
       "state" : {
-        "revision" : "322f3c2a4a21df31c84ca416bf65ee5e9059e440",
-        "version" : "2.37.5"
+        "revision" : "15e0b9e495786807272dd4891fa4bac76aa43034",
+        "version" : "2.37.6"
       }
     },
     {
@@ -438,8 +438,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-ogmios.git",
       "state" : {
-        "revision" : "972979b0c89111fcff88d75617b8e60fc6516cd9",
-        "version" : "0.4.2"
+        "revision" : "f4539c671b763eb76a32156692d2a3193bd5b25d",
+        "version" : "0.4.3"
       }
     },
     {
@@ -447,8 +447,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-generator",
       "state" : {
-        "revision" : "75962579db43e88440bbad021c74570f0955d1fd",
-        "version" : "1.14.3"
+        "revision" : "fbf4512ebc69ccbca33aa3c5fa4393887e687b76",
+        "version" : "1.14.4"
       }
     },
     {
@@ -456,8 +456,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-runtime",
       "state" : {
-        "revision" : "6927ad435adf4d00fe55fc61b9a07a04673c79c8",
-        "version" : "1.13.3"
+        "revision" : "b9ebb3f06f1dac717156a04f0919ad444cbcf8f5",
+        "version" : "1.13.4"
       }
     },
     {
