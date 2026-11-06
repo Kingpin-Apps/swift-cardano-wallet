@@ -22,7 +22,7 @@ let package = Package(
         ),
         .trait(
             name: "Hardware",
-            description: "Hardware-wallet support (Ledger/Trezor via cardano-hw-cli). Pulls SwiftCardanoUtils' CLITools (subprocess) — macOS/Linux only. Off by default; consumers that enable it must also enable SwiftCardanoUtils' CLITools trait."
+            description: "Hardware-wallet support (Ledger/Trezor via cardano-hw-cli). Links SwiftCardanoUtils, which runs cardano-hw-cli as a subprocess — macOS/Linux only. Off by default; no other trait needs enabling."
         ),
     ],
     dependencies: [
