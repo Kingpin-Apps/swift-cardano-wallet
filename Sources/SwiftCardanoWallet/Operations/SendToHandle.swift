@@ -20,11 +20,26 @@ extension MnemonicWallet {
 
     /// Build (but do not sign or submit) a transaction sending `lovelace` to the address
     /// behind an ADA Handle. Convenience over `prepareSend(lovelace:to:)`.
+    ///
+    /// Throws ``WalletError/configurationMissing(_:)`` when the handle resolves to an
+    /// address on another network, or to anything other than a key-hash payment address
+    /// (script, stake-only). Outputs built here carry no datum, so sending to a script
+    /// address could lock the funds.
     public func prepareSendTo(
         handle: String,
         lovelace: UInt64
     ) async throws -> PreparedTransaction {
         let address = try await resolveHandle(handle)
+        guard address.network == network.networkId else {
+            throw WalletError.configurationMissing(
+                "Handle \(handle) resolved to an address on another network"
+            )
+        }
+        guard case .verificationKeyHash? = address.paymentPart else {
+            throw WalletError.configurationMissing(
+                "Handle \(handle) does not resolve to a key-hash payment address"
+            )
+        }
         return try await prepareSend(lovelace: lovelace, to: address)
     }
 

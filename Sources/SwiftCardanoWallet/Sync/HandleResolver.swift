@@ -150,21 +150,43 @@ public actor DefaultHandleResolver: HandleResolver {
             throw WalletError.providerError("Handle resolver returned HTTP \(code)")
         }
 
-        // Prefer the explicit `resolved_addresses.ada` pointer (set by the holder when
-        // pointing handle to a specific payment address); fall back to `holder` otherwise.
-        // The generated Swift names are camelCase per the OpenAPI generator's idiomatic mode.
-        let bech32 = body.resolvedAddresses?.ada ?? body.holder
-        guard let bech32, !bech32.isEmpty else {
+        // Use only the explicit `resolved_addresses.ada` payment address. `holder` is a
+        // stake address per the upstream schema, so it is never a valid send destination.
+        guard let bech32 = body.resolvedAddresses?.ada, !bech32.isEmpty else {
             throw WalletError.handleNotFound(
-                "$\(normalized): handle has no resolvable address"
+                "$\(normalized): handle has no resolvable payment address"
             )
         }
 
+        return try Self.validatedPaymentAddress(bech32, handle: normalized)
+    }
+
+    /// A handle destination must be a mainnet address with a key-hash payment credential:
+    /// sends carry no datum, so a script address could lock the funds.
+    static func validatedPaymentAddress(_ bech32: String, handle normalized: String) throws -> Address {
+        let address: Address
         do {
-            return try Address.fromBech32(bech32)
+            address = try Address.fromBech32(bech32)
         } catch {
             throw WalletError.providerError(
                 "Handle '$\(normalized)' returned unparseable address '\(bech32)': \(error)"
+            )
+        }
+        guard address.network == .mainnet else {
+            throw WalletError.providerError(
+                "Handle '$\(normalized)' resolved to a non-mainnet address"
+            )
+        }
+        switch address.paymentPart {
+        case .verificationKeyHash?:
+            return address
+        case .scriptHash?:
+            throw WalletError.providerError(
+                "Handle '$\(normalized)' resolves to a script address; refusing to send without a datum"
+            )
+        case nil:
+            throw WalletError.providerError(
+                "Handle '$\(normalized)' resolves to an address with no payment credential"
             )
         }
     }
