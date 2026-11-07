@@ -165,6 +165,9 @@ extension MnemonicWallet {
         ttlSlotsFromNow: Int = 100_000,
         to: Address? = nil
     ) async throws -> PreparedTransaction {
+        guard ttlSlotsFromNow > 0 else {
+            throw WalletError.unsupportedOperation("ttlSlotsFromNow must be positive")
+        }
         let context = chainContextHandle()
         let paymentVKey = try await keyManager.paymentVerificationKey(
             at: account.paymentPath(role: .external, index: 0)
@@ -182,12 +185,15 @@ extension MnemonicWallet {
         } catch {
             throw WalletError.wrappingProvider(error)
         }
-        let ttlSlot = lastSlot + ttlSlotsFromNow
+        let (ttlSum, overflow) = lastSlot.addingReportingOverflow(ttlSlotsFromNow)
+        guard lastSlot >= 0, !overflow, let ttlSlot = SlotNumber(exactly: ttlSum) else {
+            throw WalletError.providerError("Provider tip slot \(lastSlot) gives no valid policy TTL")
+        }
 
         let policy = NativeScript.scriptAll(
             ScriptAll(scripts: [
                 .scriptPubkey(ScriptPubkey(keyHash: keyHash)),
-                .invalidHereAfter(AfterScript(slot: SlotNumber(ttlSlot))),
+                .invalidHereAfter(AfterScript(slot: ttlSlot)),
             ])
         )
 
