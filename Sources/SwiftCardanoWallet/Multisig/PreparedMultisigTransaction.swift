@@ -59,13 +59,13 @@ public struct PreparedMultisigTransaction: Sendable {
 
     /// Assemble the final signed transaction from N cosigner partials.
     ///
-    /// - Validates that every partial signs **this** transaction's body hash.
+    /// - Validates that every partial is labelled with **this** transaction's body hash and
+    ///   that its Ed25519 signature verifies over that hash with its own vkey. A forged or
+    ///   relabelled partial throws, so it can't displace a genuine signature or count toward
+    ///   the threshold.
     /// - De-duplicates by signer key hash (a malicious cosigner can't pad the witness set
     ///   by submitting twice).
     /// - Verifies the final witness count meets the policy's required-signer minimum.
-    /// - Does **not** verify Ed25519 signatures cryptographically — the chain will do that.
-    ///   We could, but it's an extra dep cycle through CryptoKit and the failure mode (rejected
-    ///   submit) is the same.
     public func combine(_ partials: [PartialWitness]) throws -> SignedTransaction {
         let expectedHash = try bodyHash
 
@@ -74,6 +74,19 @@ public struct PreparedMultisigTransaction: Sendable {
             throw WalletError.signingFailed(
                 "PartialWitness body hash does not match the prepared transaction."
             )
+        }
+
+        // Reject any partial whose signature doesn't verify over this body.
+        for partial in partials {
+            let ok = (try? partial.witness.vkey.verify(
+                signature: partial.witness.signature,
+                data: expectedHash
+            )) ?? false
+            guard ok else {
+                throw WalletError.signingFailed(
+                    "PartialWitness signature does not verify over this transaction body."
+                )
+            }
         }
 
         // De-duplicate by vkey-hash. Two partials from the same signer count as one.
@@ -113,7 +126,7 @@ public struct PreparedMultisigTransaction: Sendable {
             .map(\.value)
 
         var witnessSet = transaction.transactionWitnessSet
-        witnessSet.vkeyWitnesses = .nonEmptyOrderedSet(NonEmptyOrderedSet(sorted))
+        witnessSet.vkeyWitnesses = sorted.isEmpty ? nil : .nonEmptyOrderedSet(NonEmptyOrderedSet(sorted))
 
         let signed = Transaction(
             transactionBody: transaction.transactionBody,

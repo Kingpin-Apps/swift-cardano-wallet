@@ -181,7 +181,7 @@ public struct MultisigPolicy: Sendable, Equatable {
         case .scriptNofK(let nofk):
             // Conservative: assume the M cheapest leaves are picked.
             let costs = nofk.scripts.map { requiredCount(for: $0) }.sorted()
-            return costs.prefix(nofk.required).reduce(0, +)
+            return costs.prefix(max(0, nofk.required)).reduce(0, +)
         case .invalidBefore, .invalidHereAfter:
             return 0
         }
