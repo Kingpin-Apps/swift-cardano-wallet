@@ -1,3 +1,14 @@
+## 2.0.5 (2026-11-07)
+
+### Fix
+
+- scope balances to the account and follow the address gap rule
+- refuse a Plutus mint whose collateral has no total_collateral
+- verify multisig partial signatures and stop combine from trapping
+- reject malformed cborHex and mismatched extended key pairs on import
+- send to a handle only at a key-hash address on the wallet network
+- reject out-of-range tip slots when minting an NFT
+
 ## 2.0.4 (2026-11-07)
 
 ## 2.0.3 (2026-11-07)
