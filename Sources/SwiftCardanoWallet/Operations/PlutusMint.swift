@@ -154,6 +154,16 @@ extension MnemonicWallet {
             throw WalletError.wrappingValidation(error)
         }
 
+        // Without total_collateral the ledger forfeits the collateral inputs at their real
+        // value, not the value the provider reported. TxBuilder leaves the field unset when
+        // the collateral exceeds the requirement by 1 ADA or less, so refuse to sign that.
+        if let collateralInputs = body.collateral, collateralInputs.count > 0, body.totalCollateral == nil {
+            throw WalletError.validationFailed(
+                "Collateral UTxO is too close to the required collateral to declare total_collateral. "
+                    + "Pass a pure-ADA collateral UTxO of at least 5 ADA."
+            )
+        }
+
         let witnessSet: TransactionWitnessSet
         do {
             witnessSet = try builder.buildWitnessSet()
