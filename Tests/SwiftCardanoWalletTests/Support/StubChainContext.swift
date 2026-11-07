@@ -18,6 +18,10 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
     private(set) var submittedCBOR: [Data] = []
     /// When set, ``stakeAddressInfo(address:)`` throws it, as a failing backend would.
     var stakeAddressInfoError: (any Error)?
+    /// The tip slot ``lastBlockSlot()`` reports.
+    var lastSlot: Int = 50_000_000
+    /// Addresses ``utxos(address:)`` was asked for, in order.
+    private(set) var queriedAddresses: [Address] = []
 
     init(
         networkId: NetworkId = .testnet,
@@ -64,7 +68,7 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
 
     func era() async throws -> Era? { .conway }
     func epoch() async throws -> Int { 100 }
-    func lastBlockSlot() async throws -> Int { 50_000_000 }
+    func lastBlockSlot() async throws -> Int { lastSlot }
 
     func chainTip() async throws -> ChainTip {
         ChainTip(
@@ -80,6 +84,7 @@ final class StubChainContext: ChainContext, @unchecked Sendable {
     }
 
     func utxos(address: Address) async throws -> [UTxO] {
+        queriedAddresses.append(address)
         let key = (try? address.toBech32()) ?? address.description
         return utxosByAddress[key] ?? []
     }
