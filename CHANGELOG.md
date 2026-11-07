@@ -1,3 +1,9 @@
+## 2.0.3 (2026-11-07)
+
+### Fix
+
+- build extended signing keys with the throwing initializer
+
 ## 2.0.2 (2026-11-06)
 
 ### Fix
