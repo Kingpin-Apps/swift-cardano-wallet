@@ -77,7 +77,7 @@ public actor MnemonicKeyManager: KeyManager {
         do {
             let child = try hdWallet.derive(fromPath: path.description)
             let payload = child.xPrivateKey + child.publicKey + child.chainCode
-            derived = PaymentExtendedSigningKey(
+            derived = try PaymentExtendedSigningKey(
                 payload: payload,
                 type: PaymentExtendedSigningKey.TYPE,
                 description: PaymentExtendedSigningKey.DESCRIPTION
@@ -97,7 +97,7 @@ public actor MnemonicKeyManager: KeyManager {
         do {
             let child = try hdWallet.derive(fromPath: path.description)
             let payload = child.xPrivateKey + child.publicKey + child.chainCode
-            derived = StakeExtendedSigningKey(
+            derived = try StakeExtendedSigningKey(
                 payload: payload,
                 type: StakeExtendedSigningKey.TYPE,
                 description: StakeExtendedSigningKey.DESCRIPTION
@@ -117,7 +117,7 @@ public actor MnemonicKeyManager: KeyManager {
         do {
             let child = try hdWallet.derive(fromPath: path.description)
             let payload = child.xPrivateKey + child.publicKey + child.chainCode
-            derived = StakeExtendedSigningKey(
+            derived = try StakeExtendedSigningKey(
                 payload: payload,
                 type: StakeExtendedSigningKey.TYPE,
                 description: StakeExtendedSigningKey.DESCRIPTION

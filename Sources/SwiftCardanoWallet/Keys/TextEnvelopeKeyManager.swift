@@ -59,7 +59,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
             )
         }
         if paymentIsExtended {
-            let extSkey = PaymentExtendedSigningKey(
+            let extSkey = try PaymentExtendedSigningKey(
                 payload: paymentPayload,
                 type: PaymentExtendedSigningKey.TYPE,
                 description: PaymentExtendedSigningKey.DESCRIPTION
@@ -88,7 +88,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
             )
         }
         if stakeIsExtended {
-            let extSkey = StakeExtendedSigningKey(
+            let extSkey = try StakeExtendedSigningKey(
                 payload: stakePayload,
                 type: StakeExtendedSigningKey.TYPE,
                 description: StakeExtendedSigningKey.DESCRIPTION
@@ -113,7 +113,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
         }
         if paymentIsExtended {
             return .extendedSigningKey(
-                PaymentExtendedSigningKey(
+                try PaymentExtendedSigningKey(
                     payload: paymentPayload,
                     type: PaymentExtendedSigningKey.TYPE,
                     description: PaymentExtendedSigningKey.DESCRIPTION
@@ -143,7 +143,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
         }
         if stakeIsExtended {
             return .extendedSigningKey(
-                StakeExtendedSigningKey(
+                try StakeExtendedSigningKey(
                     payload: stakePayload,
                     type: StakeExtendedSigningKey.TYPE,
                     description: StakeExtendedSigningKey.DESCRIPTION
