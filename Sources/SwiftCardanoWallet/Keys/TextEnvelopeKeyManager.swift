@@ -65,6 +65,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
                 description: PaymentExtendedSigningKey.DESCRIPTION
             )
             let extVKey: PaymentExtendedVerificationKey = try extSkey.toVerificationKey()
+            try Self.requireKeyBinding(sign: extSkey.sign(data:), verify: extVKey.verify(signature:data:), source: "payment key")
             return try extVKey.toNonExtended()
         } else {
             let skey = PaymentSigningKey(
@@ -94,6 +95,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
                 description: StakeExtendedSigningKey.DESCRIPTION
             )
             let extVKey: StakeExtendedVerificationKey = try extSkey.toVerificationKey()
+            try Self.requireKeyBinding(sign: extSkey.sign(data:), verify: extVKey.verify(signature:data:), source: "stake key")
             return try extVKey.toNonExtended()
         } else {
             let skey = StakeSigningKey(
@@ -249,14 +251,51 @@ public actor TextEnvelopeKeyManager: KeyManager {
 
         let isExtended = envelope.type.contains("Extended")
         let payload = try decodeCBORHex(envelope.cborHex, expectedLength: isExtended ? 128 : 32)
+        if isExtended {
+            switch kind {
+            case .payment:
+                let skey = try PaymentExtendedSigningKey(
+                    payload: payload,
+                    type: PaymentExtendedSigningKey.TYPE,
+                    description: PaymentExtendedSigningKey.DESCRIPTION
+                )
+                let vkey: PaymentExtendedVerificationKey = try skey.toVerificationKey()
+                try requireKeyBinding(sign: skey.sign(data:), verify: vkey.verify(signature:data:), source: source)
+            case .stake:
+                let skey = try StakeExtendedSigningKey(
+                    payload: payload,
+                    type: StakeExtendedSigningKey.TYPE,
+                    description: StakeExtendedSigningKey.DESCRIPTION
+                )
+                let vkey: StakeExtendedVerificationKey = try skey.toVerificationKey()
+                try requireKeyBinding(sign: skey.sign(data:), verify: vkey.verify(signature:data:), source: source)
+            }
+        }
         return LoadedSkey(payload: payload, isExtended: isExtended)
+    }
+
+    /// An extended payload carries its public key at bytes 64..<96. Check that it belongs to
+    /// the private scalar by signing a fixed probe and verifying it with the embedded key, so a
+    /// tampered file can't make the wallet advertise an address this key can't spend from.
+    private static func requireKeyBinding(
+        sign: (Data) throws -> Data,
+        verify: (Data, Data) throws -> Bool,
+        source: String
+    ) throws {
+        let probe = Data("swift-cardano-wallet key binding check".utf8)
+        let ok = (try? verify(try sign(probe), probe)) ?? false
+        guard ok else {
+            throw WalletError.configurationMissing(
+                "TextEnvelope \(source): embedded public key does not match the private key"
+            )
+        }
     }
 
     /// Strip the `cardano-cli` CBOR byte-string wrapping (`5820…` for 32 bytes,
     /// `5880…` / `58 80 …` for 128 bytes) and return the raw payload.
     private static func decodeCBORHex(_ hex: String, expectedLength: Int) throws -> Data {
-        guard let raw = Data(hexString: hex) else {
-            throw WalletError.configurationMissing("Invalid cborHex: \(hex.prefix(8))…")
+        guard !hex.isEmpty, hex.count % 2 == 0, let raw = Data(hexString: hex), !raw.isEmpty else {
+            throw WalletError.configurationMissing("Invalid cborHex (\(hex.count) hex characters)")
         }
         // CBOR major type 2 (byte string) prefixes:
         //   0x58 <len:1>      for 24..255 bytes
@@ -266,7 +305,7 @@ public actor TextEnvelopeKeyManager: KeyManager {
             // Some files store raw bytes without CBOR wrapping; accept that too if length matches.
             if raw.count == expectedLength { return raw }
             throw WalletError.configurationMissing(
-                "Unexpected cborHex format: prefix \(String(format: "%02x", raw[0])); length \(raw.count)"
+                "Unexpected cborHex format: prefix \(raw.first.map { String(format: "%02x", $0) } ?? "none"); length \(raw.count)"
             )
         }
         let len = Int(raw[1])
