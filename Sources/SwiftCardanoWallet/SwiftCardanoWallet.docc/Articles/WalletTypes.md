@@ -46,7 +46,7 @@ let wallet = try await Wallet.mnemonic(
 
 BIP-39 phrase + BIP-32 HD derivation per [CIP-1852](https://cips.cardano.org/cip/CIP-1852).
 The default — backed by ``MnemonicKeyManager``. Address derivation walks the `external`
-and `change` roles up to `gapLimit` (default 20).
+and `change` roles until `gapLimit` (default 20) consecutive addresses are empty.
 
 To mint a **fresh** mnemonic wallet from scratch:
 
