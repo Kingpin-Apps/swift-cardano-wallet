@@ -1,5 +1,5 @@
 {
-  "originHash" : "b02db33d40e4de583bc8b6b3b78547cfb0fccc6617f0c0e2c87caf01b21e18fc",
+  "originHash" : "d938b6082bc9506bcb33ae8881ff0b5e240efba5728987778ef290ff644d70ee",
   "pins" : [
     {
       "identity" : "base32",
@@ -159,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-cips.git",
       "state" : {
-        "revision" : "884b032f15de3198871d9bc55e83b0713497f0a2",
-        "version" : "0.4.3"
+        "revision" : "b979f52208bfe45f31f2f50674daac893b545fdf",
+        "version" : "0.4.4"
       }
     },
     {
@@ -312,8 +312,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-jsonld.git",
       "state" : {
-        "revision" : "035741f377f59448de1480751ad59682ae9061cb",
-        "version" : "0.1.3"
+        "revision" : "80e56c1dcd856c62d23e816e0ae5fae116d555b2",
+        "version" : "0.1.4"
       }
     },
     {
@@ -483,8 +483,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-rdf-canonize.git",
       "state" : {
-        "revision" : "8c0c4cca908e323f88a2b91bcd985144101c6a80",
-        "version" : "0.2.2"
+        "revision" : "9b25ad1a2449b9df243cff8908d164aa5f07a867",
+        "version" : "0.2.3"
       }
     },
     {
