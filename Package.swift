@@ -29,7 +29,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.5.0"),
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-core.git", from: "0.11.0"),
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-chain.git", from: "0.17.0"),
-        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git", from: "2.0.4"),
+        .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git", from: "2.0.5"),
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-txvalidator.git", from: "0.6.4"),
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-utils.git", from: "0.5.12"),
         .package(url: "https://github.com/Kingpin-Apps/swift-cardano-cips.git", from: "0.4.3"),
