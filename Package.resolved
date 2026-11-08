@@ -1,5 +1,5 @@
 {
-  "originHash" : "9ae4ef370137c731288545c05cbb86c73ddb7c7a0b933e6596243ecec5c1d44e",
+  "originHash" : "77b9ec75ccf30daf596b3861154a1a68aaedfbdd54ffd39f8d06e402754a05dd",
   "pins" : [
     {
       "identity" : "base32",
@@ -159,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-cips.git",
       "state" : {
-        "revision" : "e795cd0897547cfb1646ddbd86f5018398c06793",
-        "version" : "0.4.5"
+        "revision" : "e26ec07c28f59d571d4831505ca70d5f408d6820",
+        "version" : "0.5.0"
       }
     },
     {
@@ -186,8 +186,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-cardano-txbuilder.git",
       "state" : {
-        "revision" : "b76da992d05fa06aac1713b419ce7968e9792be1",
-        "version" : "2.0.5"
+        "revision" : "d576b4b5e544d61f8b333e2c1c1ba90799cde2e2",
+        "version" : "2.0.6"
       }
     },
     {
@@ -312,8 +312,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Kingpin-Apps/swift-jsonld.git",
       "state" : {
-        "revision" : "80e56c1dcd856c62d23e816e0ae5fae116d555b2",
-        "version" : "0.1.4"
+        "revision" : "c99a7498492ba8f9c2f8440b293608cb38408206",
+        "version" : "0.1.5"
       }
     },
     {
